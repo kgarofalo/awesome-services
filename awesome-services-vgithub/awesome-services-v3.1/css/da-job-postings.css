@@ -1,0 +1,182 @@
+.job-meta-box {
+    margin: 2px 0;
+    display: flex;
+    flex-wrap:wrap;
+    gap:2px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width:100%;
+}
+.job-meta-box h4 {
+    margin: .1em;
+    display:block;
+    width:100%;
+}
+.job-meta-box .dibraco-section .section-fields{
+    display:flex;
+    flex-wrap:wrap;
+    width:100%;
+    background: #fff;
+    border: 1px solid black;
+    border-radius: 2px;
+    margin:2px;
+    gap:5px;
+    box-sizing:border-box;
+    padding:2px;
+}
+.job-meta-box .dibraco-group{
+    padding:2px;
+}
+.job-meta-box .dibraco-section {
+width:100%;
+background-color:#ffc35657;
+}
+.job-meta-box .group-fields {
+    gap:5px;
+}
+.job-meta-box .the-toggle {
+    justify-self: center;      
+    align-items: center; 
+}
+.job-meta-box .dibraco-textarea label{
+    display:flex;
+    flex-direction:column;
+}
+.job-meta-box .dibraco-textarea {
+width:60%;
+}
+.job-meta-box textarea{
+    width:100%;
+}
+.job-meta-box #education-requirements .section-fields{
+    display: flex;  
+    justify-content: space-evenly;
+    align-items: center;       
+    width: 100%;               
+    flex-wrap: wrap;          
+}
+#education_setup,
+#education_experience_fields{
+    width:100%;
+}
+
+#education_experience_fields .group-fields{
+    display:flex;
+    flex-wrap:wrap;
+}
+#education-requirements .section-fields .dibraco-toggle{
+ width:22%;
+justify-items:center;
+}
+#education-requirements .dibraco-group .group-fields{
+    flex-direction:row;
+}
+#education-requirements .dibraco-number,
+#education-requirements .dibraco-select{
+    align-self:start;
+    width:30%;
+    
+}
+.job-meta-box #education-requirements .section-fields .hidden {
+    display:none!important;
+}
+.job-meta-box .dibraco-wysiwyg.experience-description .hidden, .job-meta-box .dibraco-wysiwyg.qualifications .hidden {
+    display:none!important
+}
+
+.job-meta-box .dibraco-wysiwyg.experience-description,
+.job-meta-box .dibraco-wysiwyg.qualifications{
+    width:75%;
+    display:flex;
+    flex-direction:column;
+    align-self:start;
+}
+
+
+#job-details .section-fields {
+    justify-content:space-between;
+}
+#salary > h4{
+    display:none;
+}
+.job-meta-box #compensation .group-fields {
+    flex-direction:row;
+}
+
+
+#address {
+    width: 60%;
+}
+#address .group-fields {
+    display: flex;
+    gap: 5px;
+    flex-direction:row;
+    width: 100%;
+    flex-wrap: wrap;
+}
+.job-meta-box #benefits_section .section-fields {
+  display: flex;
+  flex-direction: column;
+  width: 100%;             
+}
+#benefits {
+    display:flex;
+    flex-wrap:wrap;
+}
+
+.job-meta-box #benefits_section .section-fields .dibraco-group .group-fields {
+  display: inline-flex;
+  flex-wrap: wrap;
+  width: 100%;
+}
+#responsibilities-skills .dibraco-textarea{
+width:100%;
+}
+
+.job-meta-box #benefits_section,
+.job-meta-box #responsibilities-skills {
+    display: flex;
+    flex-direction: column; 
+    width: 49.5%;           
+    box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+    .job-meta-box {
+        flex-direction: column; 
+    }
+
+    div#benefits_section, div#responsibilities-skills {
+        width: 100%;   
+        margin-bottom: 5px;  
+    }
+
+    /* Stack content inside .section-fields vertically for mobile */
+    .job-meta-box div#benefits_section.dibraco-section .section-fields,
+    .job-meta-box div#responsibilities-skills.dibraco-section .section-fields {
+        flex-direction: column;
+    }
+
+    /* Ensure all columns inside #responsibilities-skills take full width */
+    .job-meta-box #responsibilities-skills .section-fields > .dibraco-textarea,
+    .job-meta-box #responsibilities-skills .section-fields > #skills {
+        width: 100%; 
+        margin-bottom: 2px;  
+    }
+     .job-meta-field {
+    flex: 1 1 calc(100% - 10px); /* Single column on tablets */
+  }
+}
+
+
+
+@media (max-width: 480px) {
+  .group-field {
+    grid-template-columns: 1fr; 
+  }
+}
+
+
+
+
