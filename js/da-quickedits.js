@@ -68,3 +68,62 @@ function populateQuickEdit($postRow, $qeRow, postId) {
     });
 }
 });
+jQuery(function ($) {
+    $(document).on('click', '#bulk_edit', function (e) {
+        e.preventDefault();
+
+        const bulkEditRow = $(this).closest('tr');
+        const localizedTaxonomies = quickEditData.taxonomy;
+   const nonceValue = $('input[name="dibraco_bulk_edit_token"]').val();
+
+
+        const ajaxData = {
+            action: 'bulk_save_taxonomy_terms_on_post',
+            nonce: nonceValue,
+            post_ids: [],
+            taxonomies: localizedTaxonomies
+        };
+
+        console.log('Nonce:', ajaxData.nonce);  
+
+        bulkEditRow.find('#bulk-titles-list .ntdelbutton').each(function () {
+            const id = $(this).attr('id');
+            ajaxData.post_ids.push(id.replace('_', ''));
+        });
+
+        console.log('Post IDs:', ajaxData.post_ids); 
+
+        localizedTaxonomies.forEach(function (taxonomy_slug) {
+            const fieldName = `${taxonomy_slug}_term`;
+            const selectedTerm = bulkEditRow.find(`select[name="${fieldName}"]`).val();
+
+            ajaxData[fieldName] = selectedTerm;
+        });
+
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: ajaxData,
+            success: function (response) {
+                console.log('Response from server:', response);  // Log the full response from the server
+                if (response.success) {
+                    location.reload();  // Reload the page on success
+                } else {
+                    alert('Server error: ' + response.data);
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error('AJAX Error:', error);  // Log the actual error for debugging
+                alert('A critical server error occurred.');
+            }
+        });
+    });
+});
+
+
+
+
+
+
+
+ 

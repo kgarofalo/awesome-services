@@ -1,7 +1,10 @@
+
 function setupDependentFieldLogic(dependentFieldContainer) {
     const controllingFieldName = dependentFieldContainer.getAttribute('data-controlling-field');
     const controllingValues = dependentFieldContainer.dataset.controllingValues.split('|');
     const controllingField = document.querySelectorAll(`[name="${controllingFieldName}"]`);
+    console.log('Setting up dependent field logic for:', controllingFieldName, controllingValues);
+    console.log('Dependent Field Container:', dependentFieldContainer);
 
     controllingField.forEach(field => {
         field.addEventListener('change', toggleVisibility); 
@@ -9,12 +12,14 @@ function setupDependentFieldLogic(dependentFieldContainer) {
 
     function getFieldValue() {
         const elementType = controllingField[0].type;
+        console.log('Controlling field value type:', elementType);
 
         if (elementType === 'checkbox') {
             return Array.from(controllingField).some(el => el.checked) ? "1" : "0";
         } else if (elementType === 'radio') {
             const checkedElement = Array.from(controllingField).find(el => el.checked);
             const contValue = checkedElement.value;
+            
             if (checkedElement.classList.contains('toggle-input')) {
                 const controllingContainer = checkedElement.closest('.dibraco-toggle');
                 if (controllingContainer.getAttribute('data-controlling-field')) {

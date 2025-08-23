@@ -37,12 +37,12 @@ $service_area_fields['longitude']['value'] = $longitude;
         </td> </tr></table>
 <?php    
 $related_unique_contexts = $area_connector_context['related_unique_contexts'];
-if (!empty($related_unique_contexts)){
-render_related_unique_context_tables($related_unique_contexts, $current_service_area_term_id);
+if (!empty($related_unique_contexts)) {
+    render_context_tables($related_unique_contexts, 'unique', $current_service_area_term_id);
 }
 $related_type_contexts = $area_connector_context['related_type_contexts'];
 if (!empty($related_type_contexts)){
-render_related_type_context_tables($related_type_contexts, $current_service_area_term_id);
+render_context_tables($related_type_contexts, 'type', $current_service_area_term_id);
 }
 }
 

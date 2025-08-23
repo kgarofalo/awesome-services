@@ -3,7 +3,7 @@
 function render_card_styles_selection_page() {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['card_styles_selection_nonce']) && wp_verify_nonce($_POST['card_styles_selection_nonce'], 'save_card_styles_selection')) {
     $newly_selected_contexts = $_POST['selected_contexts'] ?? [];
-    $previously_selected_contexts = get_option('selected_contexts', []);
+    $previously_selected_contexts = get_option('selected_contexts');
     $contexts_to_remove = array_diff($previously_selected_contexts, $newly_selected_contexts);
     if (!empty($contexts_to_remove)) {
         $max_variants = 10;
@@ -54,48 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['card_styles_selection
     <?php
 }
 
-function register_card_styles_selection_page() {
-    $enabled = get_option('enabled_context_names');
-    if (empty($enabled)) return;
-    add_submenu_page(
-        'relationships',
-        'Card Styles Selection',
-        'Card Styles Selection',
-        'manage_options',
-        'card-styles-selection',
-        'render_card_styles_selection_page'
-    );
-}
-add_action('admin_menu', 'register_card_styles_selection_page', 105);
-function load_card_styles_scripts($hook) {
-    if (strpos($hook, 'card-styles-') !== false ) {  
-    wp_enqueue_style( 'dibraco-card-styles-admin-css', AWESOME_SERVICES_URL . 'css/da-card-styles-admin.css', array(), null, 'all'); 
-    }
-}
-add_action('admin_enqueue_scripts', 'load_card_styles_scripts');
 
-function register_card_styles_settings_page() {
-    $selected = get_option('selected_contexts');
-    $enabled  = get_option('enabled_contexts');
-    if (empty($selected) || empty($enabled)) return;
-    foreach ($selected as $context_name) {
-        $context_data = $enabled[$context_name]; 
-        $label        = ucwords(str_replace(['_', '-'], ' ', $context_name));
-        $menu_slug    = 'card-styles-' . str_replace('_', '-', $context_name);
 
-        add_submenu_page(
-            'relationships',
-            "{$label} Card Styles",
-            "{$label} Card Styles",
-            'manage_options',
-            $menu_slug,
-            function () use ($context_data, $context_name) {
-                dibraco_awesome_render_card_settings_page($context_data, $context_name);
-            }
-        );
-    }
-}
-add_action('admin_menu', 'register_card_styles_settings_page', 110);
 
 
 
@@ -196,7 +156,8 @@ function dibraco_get_card_settings($context_data =[], $context_name ='') {
                         'card_padding_top' => ['type' => 'text', 'value' => '10px', 'css_property' => 'padding-top'],
                         'card_padding_bottom' => ['type' => 'text', 'value' => '10px', 'css_property' => 'padding-bottom'],
                         'card_padding_right' => ['type' => 'text', 'value' => '10px', 'css_property' => 'padding-right'],
-                        'card_padding_left' => ['type' => 'text', 'value' => '10px', 'css_property' => 'padding-left']
+                        'card_padding_left' => ['type' => 'text', 'value' => '10px', 'css_property' => 'padding-left'],
+                        'card_border_style_boxes' => ['type' => 'checkbox_group', 'options' => $select_options['directions']]
                         ]
                  ]
             ]
@@ -247,7 +208,9 @@ function dibraco_get_card_settings($context_data =[], $context_name ='') {
                     'image_border_color' => ['type' => 'colorpicker', 'value' => '#FFFFFF00', 'css_property' => 'border-color'],
                     'image_border_width' => ['type' => 'text', 'value' => '0px', 'css_property' => 'border-width'], // Default to 0px as requested
                     'image_border_style' => ['type' => 'select', 'value' => 'solid', 'options' => $select_options['border_styles'], 'css_property' => 'border-style'],
-                    'image_border_radius' => ['type' => 'text', 'value' => '0px', 'css_property' => 'border-radius'] // Default to 0px as requested for flush
+                    'image_border_radius' => ['type' => 'text', 'value' => '0px', 'css_property' => 'border-radius'],
+                    'image_border_style_boxes' => ['type' => 'checkbox_group', 'options' => $select_options['directions']]
+
                 ]
             ]
         ]
@@ -287,7 +250,7 @@ function dibraco_get_card_settings($context_data =[], $context_name ='') {
                         ]
                 ]
             ]
-        ]; // End title_section
+        ]; 
         $description_section = [
             'type' => 'visual_section',
             'label' => "Description Settings",
@@ -336,10 +299,11 @@ function dibraco_get_card_settings($context_data =[], $context_name ='') {
             'label' => "Border",
             'fields' => [
                 'button_border_color' => ['type' => 'colorpicker', 'value' => '#00aef9FF', 'css_property' => 'border-color'],
-                'button_border_color_hover' => ['type' => 'colorpicker', 'value' => '#0032f9FF'], // Hover handled by CSS
+                'button_border_color_hover' => ['type' => 'colorpicker', 'value' => '#0032f9FF'], 
                 'button_border_width' => ['type' => 'text', 'value' => '1px', 'css_property' => 'border-width'],
                 'button_border_radius' => ['type' => 'text', 'value' => '5px', 'css_property' => 'border-radius'],
-                'button_border_style' => ['type' => 'select', 'value' => 'solid', 'options' => $select_options['border_styles'], 'css_property' => 'border-style']
+                'button_border_style' => ['type' => 'select', 'value' => 'solid', 'options' => $select_options['border_styles'], 'css_property' => 'border-style'],
+                'button_border_style_boxes' => ['type' => 'checkbox_group', 'options' => $select_options['directions']]
             ]
         ],
         'button_text' => [
@@ -366,12 +330,11 @@ function dibraco_get_card_settings($context_data =[], $context_name ='') {
         'button_paddings' => [
             'type' => 'field_group',
             'label' => "Padding (Auto Width/Height)",
-            'condition' => ['field' => 'use_height_width', 'values' => ["0"]],
             'fields' => [
-                'button_padding_top' => ['type' => 'text', 'value' => '10px', 'css_property' => 'padding-top'],
-                'button_padding_bottom' => ['type' => 'text', 'value' => '10px', 'css_property' => 'padding-bottom'],
-                'button_padding_right' => ['type' => 'text', 'value' => '20px', 'css_property' => 'padding-right'],
-                'button_padding_left' => ['type' => 'text', 'value' => '20px', 'css_property' => 'padding-left']
+                'button_padding_top' => ['type' => 'text', 'value' => '10px', 'css_property' => 'padding-top', 'condition' => ['field' => 'use_height_width', 'values' => ["0"]]],
+                'button_padding_bottom' => ['type' => 'text', 'value' => '10px', 'css_property' => 'padding-bottom', 'condition' => ['field' => 'use_height_width', 'values' => ["0"]]],
+                'button_padding_right' => ['type' => 'text', 'value' => '0px', 'css_property' => 'padding-right'],
+                'button_padding_left' => ['type' => 'text', 'value' => '0px', 'css_property' => 'padding-left']
             ]
         ],
         'button_margins_top_bottom' => [
@@ -410,6 +373,7 @@ $options = [
         'image_fit_options' => ['cover' => 'Cover', 'contain' => 'Contain'],
         'display_style' => ['flex' => 'Flex', 'grid' => 'Grid'],
         'positions' => ['1' => '1', '2' => '2', '3' => '3', '4' => '4'],
+        'directions' => ['top' => 'Top', 'bottom' => 'Bottom', 'left' => 'Left', 'right' => 'Right'],
         'image_fields' => ['post_thumbnail' => 'Featured Image']
     ];
 
@@ -545,6 +509,14 @@ function redirect_after_card_styles_action($query_args = []) {
 function dibraco_awesome_render_card_settings_page($context_data, $context_name) {
     $hyphenated_context_name = str_replace('_', '-', $context_name);
     $saved_settings = [];
+      $transient_key = "dibraco_active_tab_{$context_name}";
+    $current_active_tab_index = get_transient($transient_key);
+
+    if ($current_active_tab_index === false || $current_active_tab_index === '') {
+    $current_active_tab_index = "0";
+    }
+    
+    delete_transient($transient_key);
     $max_variants = 10;
     $context_type = $context_data['context_type'];
     for($variant_index = 0; $variant_index < $max_variants; $variant_index++) {
@@ -594,7 +566,9 @@ function dibraco_awesome_render_card_settings_page($context_data, $context_name)
                         redirect_after_card_styles_action(['settings-updated' => 'no_terms_selected']);
                     }
                 }
-                dibraco_save_card_styles_settings($context_name, $context_type, $_POST);
+                        dibraco_save_card_styles_settings($context_name, $context_type, $_POST);
+                        $tab_index_to_save = $_POST['dibraco_active_variant_tab_index']; 
+                set_transient($transient_key, $tab_index_to_save, 60); 
                 redirect_after_card_styles_action(['settings-updated' => '1']);
             } elseif($action_value === 'add_variant') {
                 $next_variant_index = -1;
@@ -626,21 +600,21 @@ function dibraco_awesome_render_card_settings_page($context_data, $context_name)
     <form id="card-styles-form-<?= $hyphenated_context_name ?>" method="post" action="">
         <?php wp_nonce_field($nonce_action, 'card_styles_nonce'); ?>
         <div id="<?= $hyphenated_context_name ?>-card-styles-container" class="variants-container">
+<input type="hidden" id="dibraco_active_variant_tab_index" name="dibraco_active_variant_tab_index" value="<?= esc_attr($current_active_tab_index); ?>">
 
-            <!-- Variant Tabs -->
-            <ul class="variant-tabs">
+          <ul class="variant-tabs">
                 <?php foreach (array_keys($saved_settings) as $i): ?>
-                    <li class="variant-tab<?= $i === 0 ? ' active' : '' ?>" data-tab-index="<?= $i ?>">
+                <li class="variant-tab<?= ($i == $current_active_tab_index) ? ' active' : '' ?>" data-tab-index="<?= $i ?>">
                         Variant <?= $i ?>
                     </li>
                 <?php endforeach; ?>
             </ul>
-
-            <?php foreach ($saved_settings as $index => $settings): ?>
-                <div id="variant-<?= $index ?>" class="variant-wrap<?= $index === 0 ? ' active' : '' ?>">
+ <?php foreach ($saved_settings as $index => $settings): ?>
+<div id="variant-<?= $index ?>" class="variant-wrap<?= ($index == $current_active_tab_index) ? ' active' : '' ?>">
                     <div class="heading-wrap">
                         <h3>Style Settings for Variant <?= $index ?></h3>
                     </div>
+
 
                     <?php
                     if ($context_type ==='type'){
@@ -686,27 +660,38 @@ function dibraco_awesome_render_card_settings_page($context_data, $context_name)
     </form>
 </div>
 <script>
+
 document.addEventListener('DOMContentLoaded', function() {
     const tabs = document.querySelectorAll('.variant-tab');
     const wraps = document.querySelectorAll('.variant-wrap');
+      const activeTabIndexInput = document.getElementById('dibraco_active_variant_tab_index'); 
+
+    const initiallyActiveTabElement = document.querySelector('.variant-tab.active');
+    let initialIndexValue = 0; 
+    if (initiallyActiveTabElement) {
+        initialIndexValue = parseInt(initiallyActiveTabElement.dataset.tabIndex, 10);
+    }
+    activeTabIndexInput.value = initialIndexValue; 
 
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
-            const index = tab.dataset.tabIndex;
+            const index = tab.dataset.tabIndex; 
             tabs.forEach(t => t.classList.remove('active'));
             wraps.forEach(w => w.classList.remove('active'));
-
             tab.classList.add('active');
             const activeWrap = document.getElementById(`variant-${index}`);
             activeWrap.classList.add('active');
+            activeTabIndexInput.value = parseInt(index, 10); 
         });
     });
+
 
     const contextName = '<?= esc_js($context_name); ?>';
     function getVariantIndex(element) {
         const nameParts = element.name.split('_');
         return parseInt(nameParts[nameParts.length - 1], 10);
     }
+
 
     function getCorrespondingSelect(radioElement) {
         const radioName = radioElement.name;
@@ -987,6 +972,7 @@ function generateCardCSS($section_data, $cards_section_data, $toggles, $context_
     $layout_fields = $section_data['fields']['card_alignment']['fields'];
     $border_fields = $section_data['fields']['card_border']['fields'];
     $shadow_fields = $section_data['fields']['card_box_shadow']['fields'];
+    $card_border_sides = $border_fields['image_border_style_boxes'] ?? []; 
 
     $formatted_border_fields = [
         'border_width' => $border_fields['card_border_width'],
@@ -1005,13 +991,17 @@ $regular_styles = [
         'align-items'      => $layout_fields['card_align_items'],
         'justify-content'  => $layout_fields['card_justify_content'],
         'border-radius'    => $border_fields['card_border_radius'],
-        'border'           => processBorderStyles($formatted_border_fields),
         'margin-top'        => $spacing_fields['card_margin_top'],
         'margin-bottom'     => $spacing_fields['card_margin_bottom'],
         'margin-right'      => $spacing_fields['card_margin_right'],
         'margin-left'       => $spacing_fields['card_margin_left'],
     ];
-
+    if (!empty($card_border_sides)){
+    $border_string = processBorderStyles($formatted_border_fields);
+    foreach ($card_border_sides as $side) {
+        $regular_styles["border-{$side}"] = $border_string;
+    }
+    }
    if ($toggles['card_show_box_shadow'] === '1') {
         $regular_styles['box-shadow'] = "{$shadow_fields['card_box_shadow_horizontal_offset']} {$shadow_fields['card_box_shadow_vertical_offset']} {$shadow_fields['card_box_shadow_blur_radius']} {$shadow_fields['card_box_shadow_spread_radius']} {$shadow_fields['card_box_shadow_color']}";
     }
@@ -1032,6 +1022,7 @@ function generateImageCSS($section_data, $toggles, $context_name, $variant_index
     $margin_fields = $section_data['fields']['image_margins']['fields'];
     $shadow_fields = $section_data['fields']['image_drop_shadow']['fields'];
     $border_fields = $section_data['fields']['image_border']['fields'];
+    $image_border_sides = $border_fields['image_border_style_boxes'] ?? []; 
 
     $wrapper_styles = [
         'display'         => 'flex',
@@ -1066,7 +1057,13 @@ function generateImageCSS($section_data, $toggles, $context_name, $variant_index
             'border_style' => $border_fields['image_border_style'],
             'border_color' => $border_fields['image_border_color']
         ];
-        $wrapper_styles['border'] = processBorderStyles($formatted_border_fields);
+       if (!empty($image_border_sides)) {
+            $border_string = processBorderStyles($formatted_border_fields);
+            foreach ($image_border_sides as $side) {
+            $wrapper_styles["border-{$side}"] = $border_string;
+            }
+        }
+
 
         if (!empty($border_radius_value) && $border_radius_value !== '0' && $border_radius_value !== '0px') {
             $wrapper_styles['border-radius'] = $border_radius_value;
@@ -1173,6 +1170,7 @@ function generateButtonCSS($section_data, $toggles, $context_name, $variant_inde
     $css = '';
     $color_fields = $section_data['fields']['button_colors']['fields'];
     $border_fields = $section_data['fields']['button_border']['fields'];
+    $border_fields_directions = $border_fields['button_border_style_boxes'] ?? [];
     $text_fields = $section_data['fields']['button_text']['fields'];
     $margin_tb_fields = $section_data['fields']['button_margins_top_bottom']['fields'];
     $margin_lr_fields = $section_data['fields']['button_margins_left_right']['fields'];
@@ -1182,6 +1180,7 @@ function generateButtonCSS($section_data, $toggles, $context_name, $variant_inde
     $card_selector = dibraco_get_css_selector('card-section', $context_name, $variant_index);
     $unique_container_selector = dibraco_get_css_selector('cards-section', $context_name, $variant_index);
     $card_selector_with_container = $unique_container_selector . ' ' . $card_selector; 
+    
 
     $button_selector = "{$card_selector_with_container} a.card-button";
     $button_hover_selector = "{$button_selector}:hover";
@@ -1196,27 +1195,34 @@ function generateButtonCSS($section_data, $toggles, $context_name, $variant_inde
         'text-transform'     => $text_fields['button_text_transform'],
         'text-align'         => $text_fields['button_text_align'],
         'align-items'        => 'center',    
-        'justify-content'    => 'center',    
+        'justify-content'    => $text_fields['button_text_align'],    
         'align-content'      => 'center',
-        'border'             => processBorderStyles([ 
-                                    'border_width' => $border_fields['button_border_width'],
-                                    'border_style' => $border_fields['button_border_style'],
-                                    'border_color' => $border_fields['button_border_color']
-                                ]),
         'margin-top'         => $margin_tb_fields['button_margin_top'],
         'margin-bottom'      => $margin_tb_fields['button_margin_bottom'],
     ];
+     
 
+    $formatted_border_fields = [
+    'border_width' => $border_fields['button_border_width'],
+    'border_style' => $border_fields['button_border_style'],
+    'border_color' => $border_fields['button_border_color']
+    ];
+    if (!empty($border_fields_directions)){
+       $border_string = processBorderStyles($formatted_border_fields);
+        foreach ($border_fields_directions as $direction){
+           $button_base_styles["border-{$direction}"] = $border_string;
+        }
+    }
     if ($use_fixed_dimensions === "1") { 
         $button_base_styles['width']  = $dimension_fields['button_width'];
         $button_base_styles['height'] = $dimension_fields['button_height'];
-        $button_base_styles['padding']    = '0px';
         $alignment_choice = $dimension_fields['button_align_horizontal'];
         $flex_map = ['left' => 'flex-start', 'center' => 'center', 'right' => 'flex-end'];
         $button_base_styles['align-self'] = $flex_map[$alignment_choice];
+        $button_base_styles['padding-left']   = $padding_fields['button_padding_left'];
+        $button_base_styles['padding-right']  = $padding_fields['button_padding_right'];
  
     } else { 
-        // Set padding based on fields
         $button_base_styles['padding-top']    = $padding_fields['button_padding_top'];
         $button_base_styles['padding-bottom'] = $padding_fields['button_padding_bottom'];
         $button_base_styles['padding-left']   = $padding_fields['button_padding_left'];
@@ -1233,10 +1239,18 @@ function generateButtonCSS($section_data, $toggles, $context_name, $variant_inde
         'color'              => $color_fields['button_text_hover_color'],
         'background-color'   => $color_fields['button_background_hover_color'],
     ];
-    if ($button_base_styles['border'] !== 'none' && !empty($border_fields['button_border_color_hover'])) { 
-        $button_hover_styles['border-color'] = $border_fields['button_border_color_hover'];
-    }
-
+      if (!empty($border_fields_directions)) {
+            $formatted_border_hover_fields = [
+                'border_width' => $border_fields['button_border_width'],
+                'border_style' => $border_fields['button_border_style'],
+                'border_color' => $border_fields['button_border_color_hover'] // Use the hover color here
+            ];
+            $hover_border_string = processBorderStyles($formatted_border_hover_fields); // Generate the full string with hover color
+            foreach ($border_fields_directions as $direction) {
+                $button_hover_styles["border-{$direction}"] = $hover_border_string;
+            }
+        }
+    
     $css .= formatCSSBlock($button_selector, $button_base_styles);
     $css .= formatCSSBlock($button_hover_selector, $button_hover_styles);
     return $css;

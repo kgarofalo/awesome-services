@@ -31,7 +31,7 @@ jQuery(document).ready(function ($) {
             const alpha = getAlpha();
             const hex8 = appendAlphaToHex(color, alpha);
             $hex8Input.val(hex8);
-            $colorInput.closest('.wp-picker-container').find('.wp-color-result').css('background-color', hex8);
+            $colorInput.closest('.wp-picker-container').find('.wp-color-result').css('background-color', color);
             $slider.css('background-color', color); 
         }
 
@@ -48,6 +48,7 @@ jQuery(document).ready(function ($) {
                     $irisInner.append($slider);
                     $slider.show();
                 }
+                
                 $slider.css({
                     'background-image': 'linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc), linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc)',
                     'background-size': '16px 16px',

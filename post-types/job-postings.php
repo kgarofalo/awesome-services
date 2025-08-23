@@ -56,18 +56,18 @@ $job_details_fields = [
 	'type' => 'visual_section',
 	'label' => 'Job Details',
 	'fields' => [
-		'job_title'       => ['label' => 'Job Title', 'type' => 'text', 'value' => '', 'schema' => ['target' => 'title']],
-		'employment_type' => ['label' => 'Employment Type', 'type' => 'select', 'options' => $options['employment_types'], 'value' => 'FULL_TIME', 'schema' => ['target' => 'employmentType']],
-		'direct_apply'    => ['label' => 'Apply Directly Online', 'type' => 'toggle', 'value' => "1", 'options_label' => ["1" => 'No', "0" => 'Yes'], 'schema' => ['target' => 'directApply', 'type' => 'boolean']],
-		'job_date_posted' => ['label' => 'Date Posted', 'type' => 'date', 'value' => $current_date, 'schema' => ['target' => 'datePosted']],
-		'immediate_start' => ['label' => 'Start Immediately?', 'type' => 'toggle', 'value' => "0", 'schema' => ['target' => 'jobImmediateStart', 'type' => 'boolean']],
-		'job_start_date'  => ['label' => 'Start Date', 'type' => 'date', 'value' => $current_date, 'schema' => ['target' => 'jobStartDate'], 'condition' => ['field' => 'immediate_start', 'values' => ["0"]]],
-		'job_expires'   => ['label' => 'Stop Job Post By Date?', 'type' => 'toggle', 'value' => "0", 'schema' => ['target' => 'validThrough']],
+		'job_title'       => ['label' => 'Job Title', 'type' => 'text', 'value' => ''],
+		'employment_type' => ['label' => 'Employment Type', 'type' => 'select', 'options' => $options['employment_types'], 'value' => 'FULL_TIME'],
+		'direct_apply'    => ['label' => 'Apply Directly Online', 'type' => 'toggle', 'value' => "1", 'options_label' => ["1" => 'No', "0" => 'Yes']],
+		'job_date_posted' => ['label' => 'Date Posted', 'type' => 'date', 'value' => $current_date],
+		'immediate_start' => ['label' => 'Start Immediately?', 'type' => 'toggle', 'value' => "0"],
+		'job_start_date'  => ['label' => 'Start Date', 'type' => 'date', 'value' => $current_date,  'condition' => ['field' => 'immediate_start', 'values' => ["0"]]],
+		'job_expires'   => ['label' => 'Stop Job Post By Date?', 'type' => 'toggle', 'value' => "0"],
 		'valid_through'   => ['label' => 'Valid Through', 'type' => 'date', 'value' => $current_date, 'condition' => ['field' => 'job_expires', 'values' => ["1"]]],
-		'work_hours'      => ['label' => 'Work Hours', 'type' => 'text', 'value' => '9 to 5', 'schema' => ['target' => 'workHours'], 'appendtodesc' => true],
+		'work_hours'      => ['label' => 'Work Hours', 'type' => 'text', 'value' => '9 to 5'],
 		'reports_to'      => ['label' => 'Reports To', 'type' => 'text', 'value' => ''],
-		'identifier'      => ['label' => 'Job Identifier', 'type' => 'text', 'value' => '', 'schema' => ['target' => 'identifier']],
-		'description' => ['label' => 'Description', 'type' => 'wysiwyg', 'value' => '', 'schema' => ['target' => 'description'], 'appendtodesc' => true]
+		'identifier'      => ['label' => 'Job Identifier', 'type' => 'text', 'value' => ''],
+		'description' => ['label' => 'Description', 'type' => 'wysiwyg', 'value' => '']
 	]
 ];
 $compensation_fields = [
@@ -75,15 +75,15 @@ $compensation_fields = [
     'label' => 'Compensation',
     'fields' => [
         'salary_range_toggle' => ['label' => 'Range or Exact', 'type' => 'toggle', 'value' => "1", 'options_label' => ["1" => 'Range', "0" => 'Exact']],
-        'currency' => ['type' => 'text', 'value' => 'USD', 'schema' => ['target' => 'currency']],
-        'salary_value' => ['label' => 'Exact Salary', 'type' => 'number', 'step' => "1", 'value' => '', 'condition' => ['field' => 'salary_range_toggle', 'values' => ["1"]], 'schema' => ['target' => ['value' => 'value']], 'property' => 'QuantitativeValue'], 
-        'salary' => ['label' => 'Salary Range', 'type' => 'group', 'condition' => ['field' => 'salary_range_toggle', 'values' => ["0"]], 'schema' => ['property' => 'QuantitativeValue'], 
+        'currency' => ['type' => 'text', 'value' => 'USD'],
+        'salary_value' => ['label' => 'Exact Salary', 'type' => 'number', 'step' => "1", 'value' => '', 'condition' => ['field' => 'salary_range_toggle', 'values' => ["1"]]], 
+        'salary' => ['label' => 'Salary Range', 'type' => 'group', 'condition' => ['field' => 'salary_range_toggle', 'values' => ["0"]],  
             'fields' => [
-                'min' => ['label' => 'Minimum Salary', 'type' => 'number', 'step' => '1', 'value' => '', 'schema' => ['target' => 'minValue']],
-                'max' => ['label' => 'Maximum Salary', 'type' => 'number', 'step' => '1', 'value' => '', 'schema' => ['target' => 'maxValue']]
+                'min' => ['label' => 'Minimum Salary', 'type' => 'number', 'step' => '1', 'value' => ''],
+                'max' => ['label' => 'Maximum Salary', 'type' => 'number', 'step' => '1', 'value' => '']
             ]
         ],
-        'payment_interval' => ['label' => 'Per', 'type' => 'select', 'options' => $options['salary_types'], 'value' => 'YEAR', 'schema' => ['target' => ['value' => 'unitText']]],
+        'payment_interval' => ['label' => 'Per', 'type' => 'select', 'options' => $options['salary_types'], 'value' => 'YEAR'],
         'job_benefits' => ['label' => 'Benefits Offered?', 'type' => 'toggle', 'value' => "0", 'option_labels' => ["1" => 'No', "0" => 'Yes']]
     ]
 ];
@@ -113,16 +113,16 @@ $education_requirements = [
     'label' => 'Education & Experience Setup',
     'fields' => [
         'education_setup' => ['type' => 'field_group', 'fields' => [
-            'degree_required' => ['label' => 'Degree Required?', 'type' => 'toggle', 'options_label' => ["1" => 'No', "0" => 'Yes'], 'value' => "0", 'schema' => ['target' => 'educationRequirements']],
-            'experience_required' => ['label' => 'Experience Required?', 'type' => 'toggle', 'value' => "0", 'options_label' => ["1" => 'No', "0" => 'Yes'], 'schema' => ['target' => 'experienceRequirements']],
-            'experience_in_place_of_education' => ['label' => 'Experience instead of Education', 'options_label' => ["0" => 'Yes', "1" => 'No'], 'type' => 'toggle', 'value' => "0", 'condition' => ['field' => 'experience_required', 'values' => ["1"]], 'schema' => ['target' => 'experienceInPlaceOfEducation']],
+            'degree_required' => ['label' => 'Degree Required?', 'type' => 'toggle', 'options_label' => ["1" => 'No', "0" => 'Yes'], 'value' => "0"],
+            'experience_required' => ['label' => 'Experience Required?', 'type' => 'toggle', 'value' => "0", 'options_label' => ["1" => 'No', "0" => 'Yes']],
+            'experience_in_place_of_education' => ['label' => 'Experience instead of Education', 'options_label' => ["0" => 'Yes', "1" => 'No'], 'type' => 'toggle', 'value' => "0", 'condition' => ['field' => 'experience_required', 'values' => ["1"]]],
             'qualifications_required' => ['label' => 'Qualifications Required?', 'type' => 'toggle', 'options_label' => ["1" => 'No', "0" => 'Yes'], 'value' => "0"],
         ]],
         'education_experience_fields' => ['type' => 'field_group', 'fields' => [
-            'degree_requirements' => ['label' => 'Degree Requirement', 'type' => 'select', 'options' => $options['education_levels'], 'value' => 'bachelor_degree', 'appendtodesc' => true, 'condition' => ['field' => 'degree_required', 'values' => ["1"]]],
-            'months_of_experience' => ['label' => 'Months of Experience', 'type' => 'number', 'value' => '', 'appendtodesc' => true, 'condition' => ['field' => 'experience_required', 'values' => ["1"]]],    
-            'experience_description' => ['label' => 'Describe Experience Needed', 'type' => 'wysiwyg', 'value' => '', 'appendtodesc' => true, 'condition' => ['field' => 'experience_required', 'values' => ["1"]]],
-            'qualifications' => ['label' => 'Required Qualifications?', 'type' => 'wysiwyg', 'value'=> '', 'appendtodesc' => true, 'condition' => ['field' => 'qualifications_required', 'values' => ["1"]], 'schema' => ['target' => 'qualifications']],
+            'degree_requirements' => ['label' => 'Degree Requirement', 'type' => 'select', 'options' => $options['education_levels'], 'value' => 'bachelor_degree', 'condition' => ['field' => 'degree_required', 'values' => ["1"]]],
+            'months_of_experience' => ['label' => 'Months of Experience', 'type' => 'number', 'value' => '', 'condition' => ['field' => 'experience_required', 'values' => ["1"]]],    
+            'experience_description' => ['label' => 'Describe Experience Needed', 'type' => 'wysiwyg', 'value' => '', 'condition' => ['field' => 'experience_required', 'values' => ["1"]]],
+            'qualifications' => ['label' => 'Required Qualifications?', 'type' => 'wysiwyg', 'value'=> '', 'condition' => ['field' => 'qualifications_required', 'values' => ["1"]]],
         ]]
     ]
 ];
@@ -133,11 +133,11 @@ $job_location_fields = [
 	'fields' => [
         'job_location_type' => ['label' => 'Job Location Type', 'type' => 'select', 'value' => 'Place', 'options' => $options['location_types']],     
         'addresses' => ['label' => 'Choose an Address', 'type' => 'select', 'options' => $prepopulated_address_map, 'value' => 'Place', 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']]],
-        'address' => ['label' => 'Address Details', 'type' => 'group', 'schema' => ['target' => 'jobLocation', 'property' => 'Place'], 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']], 'fields' => $address_fields],
-		'restriction_type'  => ['label' => 'Restriction Type', 'type' => 'select', 'value' => '', 'options' => $options['geo_types'],  'schema' => ['target' => 'jobLocationType', 'value' => 'TELECOMMUTE'], 'condition' => ['field' => 'job_location_type', 'values' => ['TELECOMMUTE', 'Place_TELECOMMUTE']]],
-		'country' => ['label' => 'Allowed Country', 'type' => 'repeater', 'condition' => ['field' => 'restriction_type', 'values' => ["country"]], 'fields' => ['country_name' => ['label' => 'Country Name', 'type' => 'text', 'value' => '']], 'schema' => ['target' => 'applicantLocationRequirements', 'property' => 'Country']],
-		'state' => ['label' => 'Allowed States', 'type' => 'repeater', 'condition' => ['field' => 'restriction_type', 'values' => ["state"]], 'fields' => ['state_name' => ['label' => 'State Name', 'type' => 'text', 'value' => '']],  'schema' => ['target' => 'applicantLocationRequirements', 'property' => 'State']],
-        'city' => ['label' => 'Allowed Cities', 'type' => 'repeater', 'condition' => ['field' => 'restriction_type', 'values' => ["city"]], 'fields' => ['city_name' => ['label' => 'City, State', 'type' => 'text', 'value' => '']],  'schema' => ['target' => 'applicantLocationRequirements', 'property' => 'City']]
+        'address' => ['label' => 'Address Details', 'type' => 'group', 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']], 'fields' => $address_fields],
+		'restriction_type'  => ['label' => 'Restriction Type', 'type' => 'select', 'value' => '', 'options' => $options['geo_types'],  'condition' => ['field' => 'job_location_type', 'values' => ['TELECOMMUTE', 'Place_TELECOMMUTE']]],
+		'country' => ['label' => 'Allowed Country', 'type' => 'repeater', 'condition' => ['field' => 'restriction_type', 'values' => ["country"]], 'fields' => ['country_name' => ['label' => 'Country Name', 'type' => 'text', 'value' => '']]],
+		'state' => ['label' => 'Allowed States', 'type' => 'repeater', 'condition' => ['field' => 'restriction_type', 'values' => ["state"]], 'fields' => ['state_name' => ['label' => 'State Name', 'type' => 'text', 'value' => '']]],
+        'city' => ['label' => 'Allowed Cities', 'type' => 'repeater', 'condition' => ['field' => 'restriction_type', 'values' => ["city"]], 'fields' => ['city_name' => ['label' => 'City, State', 'type' => 'text', 'value' => '']]]
         ]
 ];
 
@@ -145,8 +145,8 @@ $responsibilities_skills_fields = [
 	'type' => 'visual_section',
 	'label' => 'Responsibilities and Skills',
 	'fields' => [
-		'responsibility_description' => ['label' => 'Responsibility Description', 'type' => 'wysiwyg', 'value' => '', 'schema' => ['target' => 'responsibilities'], 'appendtodesc' => true],
-		'skills' => ['type' => 'repeater', 'fields' => ['skill' => ['type' => 'text', 'value' => '']], 'schema' => ['target' => 'skills'], 'appendtodesc' => true]
+		'responsibility_description' => ['label' => 'Responsibility Description', 'type' => 'wysiwyg', 'value' => ''],
+		'skills' => ['type' => 'repeater', 'fields' => ['skill' => ['type' => 'text', 'value' => '']]]
 	]
 ];
 
@@ -163,7 +163,6 @@ function getJobPostingOptions() {
     ];
 }
 
-add_action('wp_ajax_add_new_benefit', 'handle_add_new_benefit_ajax');
 function handle_add_new_benefit_ajax() {
     if (!current_user_can('edit_posts')) return;
     $new_benefit_name = $_POST['benefit_name'];
@@ -371,8 +370,8 @@ function build_job_posting_schema($post_id, $status) {
     $schema['title'] = $job_data['job_title'];
     $schema['description'] = extract_description_fields($job_data);
     $org_stub = _build_organization_stub_node($status);
-    $schema['hiringOrganization'] = ['@id' => $org_stub['@id']];
-    if ($job_data['job_location_type'] === 'TELECOMMUTE' || $job_data['job_location_type'] === 'Place_TELECOMMUTE'){
+    $schema['hiringOrganization'] = ['@id' => $org_stub['@id'], '@type' =>'Organization'];
+	if ($job_data['job_location_type'] === 'TELECOMMUTE' || $job_data['job_location_type'] === 'Place_TELECOMMUTE'){
         $schema['jobLocationType'] = 'TELECOMMUTE';  
         $schema['applicantLocationRequirements'] = $applicant_location_requirements['schema']; 
     }
@@ -412,6 +411,7 @@ function build_job_posting_schema($post_id, $status) {
 
     return $schema;
 }
+
 
 function extract_description_fields($job_data) {
     $html = '';

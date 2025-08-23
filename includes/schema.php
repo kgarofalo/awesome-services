@@ -2,14 +2,16 @@
 
 add_action('init', 'setup_schema_injection_hook');
 function setup_schema_injection_hook() {
-    if (!is_admin() && get_option('company_info')) {
-
+if (!is_admin()) {
+$generate_schema = get_option('company_info')['generate_schema'] ?? '';
+if ($generate_schema !=="1"){return;}
         add_action('wp_head', 'inject_dynamic_schema');
     }
 }
 
 
 function inject_dynamic_schema() {
+
     $current_post_id = get_the_ID();
     if (!$current_post_id) { return; }
     $page_url = get_permalink($current_post_id);
@@ -24,12 +26,22 @@ function inject_dynamic_schema() {
      if ($company_data['schema'] ==='Corporation'){
         $company_schema_type = 'Corporation';
     }
+    $about_page_url = '';
+    $about_page_id = get_option('company_info')['about_page'];
+    if (!empty($about_page_id)){
+    $about_page_url = trailingslashit(get_permalink($about_page_id));
+    }
+    $contact_page_url ='';
+    $contact_page_id = get_option('company_info')['contact_page'];
+    if (!empty($contact_page_id)){
+    $contact_page_url = trailingslashit(get_permalink($contact_page_id));
+    }
     $main_company_id = home_url() . '#' . $company_schema_type;
     $website_node = _build_website_node($main_company_id);
     $breadcrumb_node = _build_breadcrumb_node($current_post_id);
     $page_url = trailingslashit($page_url);
     $home_url = trailingslashit($home_url);
-
+    
     $main_entity_node = [];
     $webpage_node = [];
     $company_entity_not_on_front = []; 
@@ -66,6 +78,7 @@ function inject_dynamic_schema() {
         '@context' => 'https://schema.org',
         '@graph'   => $nodes_to_graph
     ];
+
 
     echo "\n" . '<script type="application/ld+json" class="dibraco-schema-graph">' . json_encode($graph, JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
 }
@@ -206,9 +219,6 @@ function _dibraco_filter_schema_recursive($entity) {
     return $filtered_entity;
 }
 
-
-
-
 function generate_combined_schema_graph($status, $current_post_id) {
     $current_post_type = get_post_type($current_post_id);
     $enabled_contexts = get_option('enabled_contexts');
@@ -241,7 +251,8 @@ function generate_combined_schema_graph($status, $current_post_id) {
               if (($context_data['context_name']) === 'jobs') {
                    $main_entity = build_job_posting_schema($current_post_id, $status);
                    return $main_entity;
-            }
+                   continue;
+              }
             if (($context_data['schema']) === 'Service') {
                 $term_id = dibraco_get_current_term_id_for_post($current_post_id, $context_data['taxonomy']);
                 if ($term_id !==''){
@@ -358,7 +369,6 @@ function _build_main_company_entity($company_data, $status) {
         'name'        => $company_data['name'],
         'logo'        => $logo,
         'image'       => $image,
-        'telephone'   =>  $phone_number,
         'description' => strip_tags($company_data['company_description']),
         'email'       => $company_data['email_address'],
         'faxNumber'   => $company_data['fax_number'],
@@ -368,6 +378,71 @@ function _build_main_company_entity($company_data, $status) {
    if (!empty($company_data['founding_date'])) {
         $entity['foundingDate'] = date('Y-m-d', strtotime($company_data['founding_date']));
     }
+   $enabled_type_contexts = get_option('enabled_type_contexts');
+    if (!empty($enabled_type_contexts)) {
+        foreach ($enabled_type_contexts as $context_data) {
+            if (($context_data['has_certification'] ?? '') !== '1') {
+                continue;
+            }
+
+            $taxonomy = $context_data['taxonomy'];
+            $terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => true]);
+
+            if (is_wp_error($terms) || empty($terms)) {
+                continue;
+            }
+
+            foreach ($terms as $term) {
+                if (get_term_meta($term->term_id, 'has_certification', true) !== '1') {
+                    continue;
+                }
+
+                $cert_data = get_term_meta($term->term_id, 'certification_data', true);
+
+                if (empty($cert_data['certification_name']) || isset($seen_cert_names[$cert_data['certification_name']])) {
+                    continue;
+                }
+                
+                $term_cert_node = [
+                    '@type' => 'Certification',
+                    '@id'   => $home_url . '#cert-' . $term->taxonomy . '-' . $term->term_id, // Creates a unique @id
+                    'name'  => $cert_data['certification_name'],
+                    'url'   => $cert_data['certification_url'] ?? null,
+                    'description' => $cert_data['certification_description'] ?? null,
+                    'certificationIdentification' => $cert_data['certification_id'] ?? null,
+                    'about' => $cert_data['certification_about'] ?? null,
+                ];
+
+                if (!empty($cert_data['certification_logo'])) {
+                    $term_cert_node['logo'] = wp_get_attachment_url((int)$cert_data['certification_logo']);
+                }
+                if (!empty($cert_data['certification_valid_from'])) {
+                    $term_cert_node['validFrom'] = date('Y-m-d', strtotime($cert_data['certification_valid_from']));
+                }
+                if (!empty($cert_data['certification_valid_in'])) {
+                    $term_cert_node['validIn'] = ['@type' => 'AdministrativeArea', 'name' => $cert_data['certification_valid_in']];
+                }
+                if (!empty($cert_data['certification_expires'])) {
+                    $term_cert_node['expires'] = date('Y-m-d', strtotime($cert_data['certification_expires']));
+                }
+                if (!empty($cert_data['certification_issuer_name'])) {
+                    $term_cert_node['issuedBy'] = [
+                        '@type' => 'Organization',
+                        'name'  => $cert_data['certification_issuer_name'],
+                        'url'   => $cert_data['certification_issuer_url'] ?? null,
+                    ];
+                }
+                
+                $all_certifications[] = $term_cert_node;
+                $seen_cert_names[$term_cert_node['name']] = true;
+            }
+        }
+    }
+
+    if (!empty($all_certifications)) {
+        $entity['hasCertification'] = $all_certifications;
+    }
+
     $company_social_media_data = $company_data['social_media'] ?? []; 
     $social_media_urls = [];
     foreach ($company_social_media_data as $field_key => $link_value) {
@@ -394,6 +469,7 @@ function _build_main_company_entity($company_data, $status) {
         $country = 'US';
     }
     if ($status ==='multi_areas' || $status ==='none') {
+        $entity['telephone']  = $phone_number;
         $entity['hasMap'] = $company_data['gmb_map_link'];
         $entity['address'] = [
             '@type' => 'PostalAddress',
@@ -514,6 +590,7 @@ function _build_local_business_entity_from_data($post_id, $location_term_id, $co
     $schema_type = $term_meta_data['schema'];
     $location_logo_id = $term_meta_data['location_logo'];
     $schema_type = $term_meta_data['schema'];
+    $exterior_image_id = $term_meta_data['exterior_image'];
     $hours_data = get_term_meta($location_term_id, 'hours_of_operation', true) ?? [];
     $social_media_data =  get_term_meta($location_term_id, 'social_media', true) ?? [];
     $location_description = '';
@@ -525,7 +602,10 @@ function _build_local_business_entity_from_data($post_id, $location_term_id, $co
         $location_description = strip_tags($location_description);
     }
     $street_address = trim($term_meta_data['street_address'] . ' ' . $term_meta_data['street_address_2']);
-    $exterior_image = wp_get_attachment_url($term_meta_data['exterior_image']);
+      if ($exterior_image_id !== '') {
+            $exterior_image_id = (int)$exterior_image_id;
+      }
+    $exterior_image_url = wp_get_attachment_image_url($exterior_image_id);
     $parent_organization = ['@id' => home_url('/#organization') ];
 	if ($company_schema === "Corporation"){
 		$parent_organization= ['@id' => home_url('/#corporation') ];
@@ -536,7 +616,7 @@ function _build_local_business_entity_from_data($post_id, $location_term_id, $co
         'name'      => $term_meta_data['location_name'],
         'url'       => $location_page_url,
         'description' => $location_description,
-        'image'     => $exterior_image,
+        'image'     => $exterior_image_url,
         'telephone' => _format_phone_number_e164($term_meta_data['phone_number']),
         'email'     => $term_meta_data['email_address'],
         'faxNumber' => $term_meta_data['fax_number'],
@@ -661,7 +741,7 @@ function _build_service_area_entity($post_id, $term_id, $context_data, $status) 
         $area_description = get_post_meta($post_id, 'da_banner_description', true) ?? '';
     } 
     if ($area_description !==''){
-         $area_description = strip_tags($banner_description); 
+         $area_description = strip_tags($area_description); 
     }
     $entity = [
         '@type'      => ['Service', 'City'],
@@ -786,11 +866,10 @@ function _build_service_entity($post_id, $type_term_id, $context_data, $status) 
     }
     $entity['serviceType'] = $service_type_name;
     
-    // --- CERTIFICATION SECTION ---
     if (($context_data['has_certification']) === '1') {
         $has_certification_term_meta = get_term_meta($type_term_id, 'has_certification', true);
 
-        if ($has_certification_term_meta === "1") { // This is the block that was missing a closing brace
+        if ($has_certification_term_meta === "1") { 
             $certification_data = get_term_meta($type_term_id, 'certification_data', true);
 
             $certification_node = [
@@ -919,17 +998,46 @@ function _build_local_business_stub_from_data($term_id) {
         if (!is_array($hours_data)) {
         $hours_data = []; 
     }
+    $exterior_image_id =  get_term_meta($term_id, 'exterior_image', true);
+    if ($exterior_image_id!==''){
+        $exterior_image_id= (int)$exterior_image_id;
+      $exterior_image_url = wp_get_attachment_image_url($exterior_image_id);
+    }
 	$company_schema = get_option('company_info')['schema'];
 	$parent_organization = ['@id' => home_url('/#organization')];
 	if ($company_schema === 'Corporation'){
 		$parent_organization = ['@id' => home_url('/#corporation')];
 	}
+	$street_address = get_term_meta($term_id, 'street_address', true);
+	$city = get_term_meta($term_id, 'city', true);
+	$state = get_term_meta($term_id, 'state', true);
+	$zipcode = get_term_meta($term_id, 'zipcode', true);
+    $country =  get_term_meta($term_id, 'addy_country', true);
+    $lat = get_term_meta($term_id, 'latitude', true);
+    $long = get_term_meta($term_id, 'longitude', true);
+    $map =   get_term_meta($term_id, 'gmb_map_link', true);
     $status = get_option('locations_areas_status');
         $stub = [
         '@type' => $schema_type,
         '@id'   => $url . '#' . strtolower($schema_type),
         'name'  => $name,
         'url'   => $url,
+        'image' => $exterior_image_url,
+        'priceRange' => '$$',
+        'address'   => [
+            '@type'           => 'PostalAddress',
+            'streetAddress'   => $street_address,
+            'addressLocality' => $city,
+            'addressRegion'   => $state,
+            'postalCode'      => $zipcode,
+            'addressCountry'  => $country
+        ],
+        'geo' => [
+            '@type'     => 'GeoCoordinates',
+            'latitude'  => $lat,
+            'longitude' => $long,
+        ],
+        'hasMap' => $map,
         'telephone' =>  _format_phone_number_e164($phone),
         'openingHoursSpecification' => _build_opening_hours_spec($hours_data),
         'parentOrganization' => $parent_organization
@@ -937,7 +1045,6 @@ function _build_local_business_stub_from_data($term_id) {
     
     return $stub;
 }
-
 function _build_city_objects_for_area_served($term_id) {
     $service_area_name = get_term($term_id)->name;
     $city = get_term_meta($term_id, 'city', true);

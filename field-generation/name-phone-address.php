@@ -27,7 +27,8 @@ function get_address_fields() {
     "addy_country"      => ['type' => 'text', 'label' => 'Country'],
     "latitude"          => ['type' => 'text'],
     "longitude"         => ['type' => 'text'],
-    "google_map_embed"  => ['type' => 'textarea']
+    "normal_map" => ['type' => 'text'],
+    "street_map" => ['type' => 'text'],
   ];
 }
 
@@ -53,25 +54,6 @@ function get_portrait_image_fields($context_type = '') {
     }
     return $fields;
 }
-
-function get_banner_fields(){
-    return  [
-    'da_main_h1'            => ['label' => 'Main H1', 'type' => 'text'],
-    'da_banner_description' => ['label' => 'Banner Description', 'type' => 'wysiwyg', 'wpautop' => false, 'media_buttons' => true, 'teeny' => false, 'rows' => 5],
-];
-}
-function get_contact_fields(){
-return [
-    'da_quote_title'        => ['label' => 'Quote Title', 'type' => 'text'],
-    'da_contact_section'    => ['label' => 'Contact Section', 'type' => 'wysiwyg', 'wpautop' => false, 'media_buttons' => false, 'teeny' => false, 'rows' => 5],
-];
-}
-function get_about_fields(){
-  return[
-    'da_about_title' =>['type' => 'text'],
-    'da_about_blurb' => ['type' => 'wysiwyg', 'wpautop' => false, 'media_buttons' => true, 'teeny' => false, 'rows' => 7]
-    ];
-}
 function get_service_area_term_fields (){
 $fields =[];
         $fields['city'] = ['type' => 'text'];
@@ -80,13 +62,34 @@ $fields =[];
         $fields['longitude']   = ['type' => 'text'];
 return $fields;
 }
+function get_banner_fields(){
+    return  [
+    'da_main_h1'            => ['label' => 'Main H1', 'type' => 'text'],
+    'da_banner_description' => ['label' => 'Banner Description', 'type' => 'wysiwyg', 'wpautop' => false, 'media_buttons' => true, 'teeny' => false, 'rows' => 7],
+];
+}
+function get_contact_fields(){
+return [
+    'da_quote_title'        => ['label' => 'Quote Title', 'type' => 'text'],
+    'da_contact_section'    => ['label' => 'Contact Section', 'type' => 'wysiwyg', 'wpautop' => false, 'media_buttons' => false, 'teeny' => false, 'rows' => 7],
+];
+}
+function get_about_fields(){
+  return[
+    'da_about_title' =>['type' => 'text', 'label' => 'About Title'],
+    'da_about_blurb' => ['type' => 'wysiwyg', 'label' => 'About Blurb', 'wpautop' => false, 'media_buttons' => true, 'teeny' => false, 'rows' => 7],
+    'da_commercial_title' =>['type' => 'text', 'label' => 'Commercial Title'],
+    'da_commercial_section' => ['type' => 'wysiwyg', 'label' => 'Commercial Section', 'wpautop' => false, 'media_buttons' => true, 'teeny' => false, 'rows' => 7]
+    ];
+}
+
 function get_section_title_fields() {
     $fields = [];
     $fields['da_section_1_title'] = ['label' => 'Section 1 Title', 'type' => 'text'];
     $fields['da_section_1_p']     = ['label' => 'Section 1 Paragraph', 'type' => 'wysiwyg', 'wpautop' => false, 'media_buttons' => true, 'teeny' => false, 'rows' => 7];
     $fields['da_section_2_title'] = ['label' => 'Section 2 Title', 'type' => 'text'];
-    $fields['da_section_3_title'] = ['label' => 'Section 3 Title', 'type' => 'text'];
     $fields['da_section_2_p']     = ['label' => 'Section 2 Paragraph', 'type' => 'wysiwyg', 'wpautop' => false, 'media_buttons' => true, 'teeny' => false, 'rows' => 7];
+    $fields['da_section_3_title'] = ['label' => 'Section 3 Title', 'type' => 'text'];
     $fields['da_section_3_p']     = ['label' => 'Section 3 Paragraph', 'type' => 'wysiwyg', 'wpautop' => false, 'media_buttons' => true, 'teeny' => false, 'rows' => 7];
     return $fields;
 }
@@ -98,41 +101,51 @@ $fields = [
  return $fields;
 }
 
-function get_employee_fields(){
+function get_employee_fields($has_certification ="0"){
     $fields = [
-    'employee-fields' => [ 'type' => 'visual_section', 'fields' => [
-    'given_name' => ['type' => 'text', 'label' => 'First Name'],
-    'family_name' => ['type' => 'text', 'label' => 'Last Name'],
-    'work_email' => ['type' => 'text'],
-    'work_phone' => ['type' => 'text'],
-    'cell_number' => ['type' => 'text'],
-    'job_title' => ['type' => 'text'],
-    'employee_bio' => ['type' => 'textarea']
-    ]
-    ]];
-    $use_cert_field = get_option('enabled_unique_contexts')['employee']['has_certification'] ?? '0';
-    if ($use_cert_field ==="1"){
+    'employee-fields' => [
+        'type' => 'visual_section', 'fields' => 
+            [
+            'given_name' => ['type' => 'text', 'label' => 'First Name'],
+            'family_name' => ['type' => 'text', 'label' => 'Last Name'],
+            'work_email' => ['type' => 'text'],
+            'work_phone' => ['type' => 'text'],
+            'cell_number' => ['type' => 'text'],
+            'job_title' => ['type' => 'text'],
+            'employee_bio' => ['type' => 'textarea']
+            ]
+        ]   
+    ];
+    if ($has_certification ==="1"){
         $fields['employee-fields']['fields']['has_certification'] = ['type' => 'toggle', 'value' => "0"];
+        $certification_fields = get_certification_fields();
+        $fields['employee-fields']['fields']['certification_data'] = $certification_fields['certification_data'];
+
     }
     return $fields;
 }
 function get_certification_fields() {
   return [
-      'certification_section' => ['type' => 'visual_group', 'condition'=> ['field' => 'has_certification', 'values' => ["1"]], 'fields' => [
-		'certification_name' => ['type' => 'text', 'label' => 'Certification Name'],
-        'certification_id' => ['type' => 'text', 'label' => 'Certification ID'],
-        'certification_valid_from' => ['type' => 'date', 'label' => 'Valid From'],
-        'certification_expires' => ['type' => 'date', 'label' => 'Expires'],
-        'certification_valid_in' => ['type' => 'text', 'label' => 'Region or Area'],
-		'certification_url' => ['type' => 'text', 'label' => 'Certification URL'],   
-        'certification_issuer_name' => ['type' => 'text', 'label' => 'Issuer Name'],
-        'certification_issuer_url' => ['type' => 'text', 'label' => 'Issuer Website'],
-        'certification_about' => ['type' => 'textarea', 'label' => 'Issuer Description'],
-		'certification_description'  => ['type' => 'textarea', 'label' => 'Certification Description'],         'certification_logo' => ['type' => 'image', 'label' => 'Certification Logo'],
-      ]
-    ]
-  ];
+     'certification_data' => [
+        'type' => 'visual_group',
+        'condition'=> ['field' => 'has_certification', 'values' => ["1"], 'current_value' => ''],
+        'fields' => [
+		    'certification_name' => ['type' => 'text', 'label' => 'Certification Name'],
+            'certification_id' => ['type' => 'text', 'label' => 'Certification ID'],
+            'certification_valid_from' => ['type' => 'date', 'label' => 'Valid From'],
+            'certification_expires' => ['type' => 'date', 'label' => 'Expires'],
+            'certification_valid_in' => ['type' => 'text', 'label' => 'Region or Area'],
+		    'certification_url' => ['type' => 'text', 'label' => 'Certification URL'],   
+            'certification_issuer_name' => ['type' => 'text', 'label' => 'Issuer Name'],
+            'certification_issuer_url' => ['type' => 'text', 'label' => 'Issuer Website'],
+            'certification_about' => ['type' => 'textarea', 'label' => 'Issuer Description'],
+	    	'certification_description'  => ['type' => 'textarea', 'label' => 'Certification Description'],
+	    	'certification_logo' => ['type' => 'image', 'label' => 'Certification Logo'],
+            ]
+        ]
+    ];
 }
+
 
 
 final class DIBRACO_GMB_Integrator {

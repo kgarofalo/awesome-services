@@ -1,12 +1,9 @@
 <?php
-require_once AWESOME_SERVICES_PATH . 'awesome-services-main.php';
+require_once AWESOME_SERVICES_PATH . 'awesome-services.php';
 function carolina_display_repeater_data_shortcode() {
     $post_id = get_the_ID();
-    if (!$post_id) {
-        return ''; 
-    }
     $repeater_data = get_post_meta( $post_id, '_list_repeater', true );
-    if ( empty( $repeater_data ) || ! is_array( $repeater_data ) ) {
+    if (!is_array( $repeater_data )) {
         return '';
     }
 
@@ -66,11 +63,11 @@ function dibraco_get_all_field_definitions() {
         }
     }
 
-    foreach (get_employee_fields()['employee-fields']['fields'] as $key => $config) {
-        $fields[$key] = ['storage' => 'array', 'array_key' => 'employee_data', 'type' => $config['type']];
+	foreach (get_employee_fields()['employee-fields']['fields'] as $key => $config) {
+        $fields[$key] = ['storage' => 'array', 'array_key' => 'employee-fields', 'type' => $config['type']];
     }
 
-    foreach (get_certification_fields()['certification_section']['fields'] as $key => $config) {
+    foreach (get_certification_fields()['certification_data']['fields'] as $key => $config) {
         $fields[$key] = ['storage' => 'array', 'array_key' => 'employee_certification_data', 'type' => $config['type']];
     }
     return $fields;
@@ -153,7 +150,6 @@ function display_post_taxonomy_terms_list($atts) {
 add_shortcode('post_taxonomy_terms', 'display_post_taxonomy_terms_list');
 
 
-
 function dibraco_location_map_shortcode($atts) {
     $atts = shortcode_atts([
         'view'      => 'normal',
@@ -166,83 +162,37 @@ function dibraco_location_map_shortcode($atts) {
     $view_type = $atts['view'];
     $location_slug = $atts['loc'];
     $post_id = get_the_ID();
-
     if (!$post_id) {
         return '';
     }
-
-    $map_data = [];
-    $keys = ['street_address', 'street_address_2', 'city', 'state', 'zipcode', 'addy_country', 'latitude', 'longitude', 'place_id'];
-    $location_term_id = da_get_location_term_or_default($post_id, $location_slug);
-
-    if ($location_term_id) {
-        $name_key = 'location_name';
-        $keys[] = $name_key;
-        foreach ($keys as $key) {
-            $map_data[$key] = get_term_meta($location_term_id, $key, true);
-        }
+    if ($view_type === 'street'){
+        $key = 'street_map';
     } else {
-        $name_key = 'name';
-        $keys[] = $name_key;
-        $company_info = get_option('company_info');
-        if (!empty($company_info)) {
-            foreach ($keys as $key) {
-                $map_data[$key] = $company_info[$key];
-            }
-        }
+        $key = 'normal_map';
     }
-    if (empty(array_filter($map_data))) {
-        return '';
+    $location_term_id = da_get_location_term_or_default($post_id, $location_slug);
+    $map_embed_url ='';
+    if ($location_term_id) {
+       $map_embed_url = get_term_meta($location_term_id, $key, true );
+    } else {
+      $map_embed_url = get_option('company_info')[$key]??'';
     }
-    $address_parts = [
-        $map_data[$name_key],
-        $map_data['street_address'],
-        $map_data['street_address_2'],
-        $map_data['city'],
-        $map_data['state'],
-        $map_data['zipcode']
-    ];
-    $address_query = implode(', ', array_filter($address_parts));
-    $coords_query = '';
-    if (!empty($map_data['latitude']) && !empty($map_data['longitude'])) {
-        $coords_query = $map_data['latitude'] . ',' . $map_data['longitude'];
-    }
-    $map_embed_src = '';
-    switch ($view_type) {
-        case 'street':
-            if ($coords_query) {
-                $streetview_params = [
-                    'q'      => $address_query ?: $coords_query,
-                    'cbll'   => $coords_query,
-                    'cbp'    => '12,235,,0,5',
-                    'layer'  => 'c',
-                    'output' => 'svembed'
-                ];
-                $map_embed_src = 'https://maps.google.com/maps?q=' . http_build_query($streetview_params);
-            }
-        break;
-        case 'satellite':
-        case 'normal':
-        default:
-            $location_query = $address_query ?: $coords_query;
-            if ($location_query) {
-                $base_url = 'https://maps.google.com/maps?q=' . urlencode($location_query);
-                $map_type_param = ($view_type === 'satellite') ? '&t=k' : '';
-                $map_embed_src = $base_url . '&z=14' . $map_type_param . '&output=embed';
-            }
-            break;
-    }
-    if (empty($map_embed_src)) {
-        return '';
-    }
-    $iframe_style = sprintf(
+
+if ($map_embed_url === '') { return ''; }
+if ($view_type === 'satellite') {
+    $map_embed_url .= '&t=k';
+}
+if ($view_type !=='street'){
+ $map_embed_url .= '&output=embed';
+}
+$iframe_style = sprintf(
         'style="width: %s; height: %s; max-width: %s; border: 0;"',
         esc_attr($atts['width']),
         esc_attr($atts['height']),
         esc_attr($atts['max_width'])
     );
 
-    $iframe_html = '<div class="dibraco-location-map"><iframe src="' . esc_url($map_embed_src) . '" ' . $iframe_style . ' allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>';
+    $iframe_html = '<div class="dibraco-location-map"><iframe src="' . esc_url($map_embed_url) . '" ' . $iframe_style . ' allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>';
     return $iframe_html;
 }
 add_shortcode('dibraco_location_map', 'dibraco_location_map_shortcode');

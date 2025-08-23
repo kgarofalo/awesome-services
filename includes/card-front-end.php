@@ -343,7 +343,7 @@ foreach ($cards as $card) {
         }
 
         if ($image_id) {
-            $image_url = wp_get_attachment_image_url($image_id, 'full');
+            $image_url = wp_get_attachment_image_url($image_id, 'medium');
            $sortable_content[$card_style_settings['cards_image_position']] = '<div class="'.esc_attr("{$css_context_name}-image-section card-image-wrap").'"><img class="card-image" src="'.esc_url($image_url).'" alt="'.esc_attr($card['related_post_title']).'" title="'.esc_attr($card['related_post_title']).'"></div>';
 
         }

@@ -1,40 +1,48 @@
 <?php
 class FormHelper {
-private static function prepareField($field_id, $condition, $base_class) {
-    $condition = is_array($condition) ? $condition : [];
-    $data_attr = str_replace('_', '-', $field_id); 
-    $data_name = "data-name='{$data_attr}'";
-    $whole_class = "class='{$base_class} {$data_attr}'";  
-    $condition_attributes = ''; 
-
-    if (empty($condition)) {
-        return [
-            'class_string' => $whole_class,
-            'data_name' => $data_name,
-            'condition_attributes' => '',
-        ];
-    }
-
-    $controlling_field = $condition['field'] ?? '';
-    $controlling_values = implode('|', (array) ($condition['values'] ?? []));
-
-    $condition_attributes = " data-controlling-field='{$controlling_field}'";
-    $condition_attributes .= " data-controlling-values='{$controlling_values}'";
-
-    return [
-        'class_string' => $whole_class,
-        'data_name' => $data_name,
-        'condition_attributes' => $condition_attributes,
-    ];
-}
     private static $tracking_started = false;
     private static $nested_tracking_started = false;
     private static $tracked_field_names = [];
     private static $meta_array = [];
     private static $nested_array=[];
     private static $nested_tracking_fields=[];
+private static function prepareField($field_id, $condition, $base_class) {
+    $condition = is_array($condition) ? $condition : [];
+    $data_attr = str_replace('_', '-', $field_id);
+    $data_name = "data-name='{$data_attr}'";
+    $class_list = "{$base_class} {$data_attr}";
+    $whole_class = "class='{$base_class} {$data_attr}'";
+    $condition_attributes = '';
+    if (empty($condition)) {
+        return [
+            'class_string' => "class='{$class_list}'",
+            'data_name' => $data_name,
+            'condition_attributes' => '',
+        ];
+    }
+    
+    $controlling_field = $condition['field'];
+    $current_value = $condition['current_value'] ?? '';
+    $controlling_values = implode('|', (array) ($condition['values']));
+    $condition_attributes = "data-controlling-field='{$controlling_field}'";
+    $condition_attributes .= "data-controlling-values='{$controlling_values}'";
+    if (($current_value !=='')) {
+         if (in_array($current_value, (array) ($condition['values']))) {
+            $class_list .= " visible";
+         }
+        if (!in_array($current_value, (array) ($condition['values']))) {
+             $class_list .= " hidden";
+         }
+    }
+    return [
+        'class_string' => "class='{$class_list}'",
+        'data_name' => $data_name,
+        'condition_attributes' => $condition_attributes,
+    ];
+}
+
 public static function generateButtonField($field_id, $label, $class, $condition = []) {
-    extract(self::prepareField($field_id, $condition, "dibraco-button"));
+extract(self::prepareField($field_id, $condition, "dibraco-button"));
 $button_text = ucwords(str_replace(['_', '-'], ' ',$label)); 
     return "<div {$class_string} {$condition_attributes}>
                 <button id='{$field_id}' name='{$field_id}' type='button' class='{$class}' {$data_name}>
@@ -77,7 +85,7 @@ public static function generateToggleSwitch($field_id, $label, $value, $options_
         $value = "1"; 
     }
     return "
-        <div id='{$field_id}' {$class_string} {$condition_attributes}>
+        <div id='{$field_id}' {$class_string} {$condition_attributes}{$data_name}>
           <legend class='toggle-legend'>{$label}</legend>
             <div class='the-toggle'>
                 <input type='radio' name='{$field_id}' value='1' " . checked($value, "1", false) . " class='toggle-input toggle-yes' id='{$field_id}_yes'>
@@ -92,7 +100,7 @@ public static function generateToggleSwitch($field_id, $label, $value, $options_
 
 public static function generateCheckBox($field_id, $label, $value, $condition = []) {
     extract(self::prepareField($field_id, $condition, "dibraco-checkbox"));
-    $value = ($value === "1") ? "1" : "0";
+    $value = ($value == "1") ? "1" : "0";
     $checked_attr = ($value === "1") ? 'checked' : '';
     return "<div {$class_string} {$condition_attributes}>
             <label for='{$field_id}'>{$label}</label>
@@ -100,11 +108,39 @@ public static function generateCheckBox($field_id, $label, $value, $condition = 
                 <input type='checkbox' id='{$field_id}' {$data_name} name='{$field_id}' value='1' {$checked_attr}>
         </div>";
 }
+public static function generateCheckboxGroup($field_id, $label, $selected_values = [], $options = [], $condition = []) {
+        extract(self::prepareField($field_id, $condition, "dibraco-checkbox-group"));
+        $selected_values = is_array($selected_values) ? array_map('strval', $selected_values) : [];
+        $options_html = '';
+        foreach ($options as $option_value => $option_label) {
+            $checkbox_id = "{$field_id}_{$option_value}";
+            $checked = '';
+            if (in_array((string)$option_value, $selected_values, true)) {
+                $checked = 'checked';
+            } else if (empty($selected_values)) {
+                $checked = 'checked';
+            }
+            $options_html .= "
+                <label for='{$checkbox_id}' style='margin-right: 10px; display: inline-block;'>
+                    <input type='checkbox' id='{$checkbox_id}' name='{$field_id}[]' value='{$option_value}' {$checked} {$data_name}>
+                    " . esc_html($option_label) . "
+                </label>";
+        }
+        return "
+            <div id='{$field_id}' {$class_string} {$condition_attributes}>
+                <h4>" . esc_html($label) . "</h4>
+                <div class='checkbox-group-wrapper'>
+                    {$options_html}
+                </div>
+            </div>";
+    }
 
 
 public static function generateSelect($field_id, $label, $value, $options, $condition = []) {
     extract(self::prepareField($field_id, $condition, "dibraco-select"));
-
+   if (isset($options['__no_change__'])) {
+        $value = '__no_change__'; 
+    }
     $options_html = '';
     $options_html .= '<option value="">Please select</option>';
     foreach ($options as $option_value => $option_label) {
@@ -123,34 +159,32 @@ public static function generateSelect($field_id, $label, $value, $options, $cond
 }
 public static function generateRadioFieldsetWithIntegerValues($field_id, $label, $value, $options_array = [], $condition = []) {
     extract(self::prepareField($field_id, $condition, "dibraco-radio-fieldset"));
-    $options_html = "";
-    $none_value = ''; 
-    $none_id = "{$field_id}_none";
-    $none_checked = ($value === '') ? 'checked' : '';
-    $options_html .= "
-        <label for='{$none_id}'>
-            <input type='radio' id='{$none_id}' name='{$field_id}' value='{$none_value}' {$none_checked}>None</label>";
-
+    $options_array = ['' => 'none'] + $options_array;
+    $options_html = '';
     foreach ($options_array as $option_value => $option_label) {
         $option_id = "{$field_id}_{$option_value}";
-        $checked = intval($value) === intval($option_value) ? 'checked' : '';
+        $checked = '';
+        if ($value === '' && $option_value === '') {
+            $checked = 'checked';
+        } elseif ($value !== '' && intval($value) === intval($option_value)) {
+            $checked = 'checked';
+        }
         $data_name = "data-name='{$field_id}'";
         $options_html .= "
             <label for='{$option_id}'>
                 <input type='radio' id='{$option_id}' name='{$field_id}' {$data_name} value='{$option_value}' {$checked}>$option_label</label>";
     }
-          $fieldset = 'fieldset';
+    $fieldset = 'fieldset';
     if ($field_id === 'area_parent_location_term'){
         $fieldset = 'div';
     }
     return "<div {$class_string} {$condition_attributes}>
-             <p>{$label}</p>
-             <$fieldset id='{$field_id}'>
-                {$options_html}
-            </$fieldset>
-        </div>";
+                <p>{$label}</p>
+                <$fieldset id='{$field_id}'>
+                    {$options_html}
+                </$fieldset>
+            </div>";
 }
-
 public static function generateRadioFieldset($field_id, $label, $value, $options_array = [], $condition = []) {
     extract(self::prepareField($field_id, $condition, "dibraco-radio"));
     $options_html = "";
@@ -253,8 +287,12 @@ public static function generateField($field_name, $field_config) {
         if ($type !== 'button' && !array_key_exists('value', $field_config)) {
             $field_config['value'] = '';  
         }
+        
         $rows_textarea = $field_config['rows'] ?? '';
         $value = $field_config['value'] ?? '';
+           if($value ===''){
+            $value =  $field_config['value'] = '';
+           }
         $legend = $field_config['legend'] ?? '';
         $class = $field_config['class'] ?? '';
         $image_url = $field_config['data-url'] ?? '';
@@ -301,12 +339,32 @@ public static function generateField($field_name, $field_config) {
                 return self::generateCheckbox($field_name, $label, $value, $condition);
             case 'wysiwyg':
                 return self::generateWysiwyg($field_name, $label, $value, $condition, $field_config);
+            case 'checkbox_group':
+                return self::generateCheckboxGroup($field_name, $label, $value, $options, $condition);
+            case 'no-edit':
+                return self::generateNoEditField($field_name, $label, $value, $options, $condition);
+             case 'hidden': 
+                 return self::generateHiddenField($field_id, $value, $condition = []);
         }
 
         return "Error: Unsupported field type '{$type}'.";
     }
-
-
+public static function generateNoEditField($field_id, $label, $value, $condition = []) {
+    extract(self::prepareField($field_id, $condition, "dibraco-no-edit"));
+    
+    return "<div {$class_string} {$condition_attributes}>
+                <label>{$label}</label>
+                <p id='{$field_id}' {$data_name}>" 
+                    . esc_html($value) . 
+                "</p>
+            </div>";
+}
+public static function generateHiddenField($field_id, $value, $condition = []) {
+    extract(self::prepareField($field_id, $condition, "dibraco-hidden-field"));
+    return "<div {$class_string} {$condition_attributes} style='display: none;'>
+                <input type='hidden' id='{$field_id}' name='{$field_id}' value='" . esc_attr($value) . "'>
+            </div>";
+}
 public static function generateTextInput($field_id, $label, $value, $condition = []) {
     extract(self::prepareField($field_id, $condition, "dibraco-text"));
     return "<div {$class_string} {$condition_attributes}>
@@ -356,9 +414,12 @@ public static function generateTimeInput($field_id, $label, $value, $condition =
 
 public static function generateColorPicker($field_id, $label, $value, $condition = []) {
     extract(self::prepareField($field_id, $condition, "dibraco-color-picker"));
-     $color = '#FFFFFF';
-     $alpha = 1.0;
-    if (((strlen($value) === 7) || (strlen($value) === 9)) && (substr($value, 0, 1) === '#')){
+    $color = '#FFFFFF';
+    $alpha = 1.0;
+    $value = trim((string) $value);
+    $value = ltrim($value, '#');
+    $value = '#' . substr($value, 0, 8);
+    if (((strlen($value) === 7) || (strlen($value) === 9)) && (substr($value, 0, 1) === '#')) {
         if (strlen($value) === 9) {
             $color = substr($value, 0, 7); 
             $alpha = round(hexdec(substr($value, 7, 2)) / 255.0, 2);
@@ -366,6 +427,7 @@ public static function generateColorPicker($field_id, $label, $value, $condition
             $color = $value; 
         }
     }
+
     return "
     <div {$class_string} {$condition_attributes} {$data_name}>
         <label for='{$field_id}'>{$label}
@@ -404,21 +466,18 @@ public static function generateImageField($field_id, $label, $value, $condition 
 
 
 public static function generateVisualSection($field_name, $field_config, $is_recursive = false) {
+    
     $label     = $field_config['label'] ?? ucwords(str_replace(['_', '-'], ' ', $field_name));
     $condition = $field_config['condition'] ?? [];
     $fields    = $field_config['fields'] ?? [];
-
     extract(self::prepareField($field_name, $condition, "dibraco-section"));
-
     $subfields_html = '';
-
     foreach ($fields as $subfield_name => $subfield_config) {
         if (($subfield_config['type'] !=='group') && ($subfield_config['type'] !=='field_group')){
         $subfield_config['label'] = $subfield_config['label'] ?? ucwords(str_replace(['_', '-'], ' ', $subfield_name));
+        $subfield_config['label'] = ucwords(str_replace(['_', '-'], ' ', $subfield_name));
         }
-        
         $subfield_config['condition'] = $subfield_config['condition'] ?? [];
-
         switch ($subfield_config['type']) {
             case 'visual_section':
                 $subfields_html .= self::generateVisualSection($subfield_name, $subfield_config, true);
@@ -438,10 +497,9 @@ public static function generateVisualSection($field_name, $field_config, $is_rec
                 break;
         }
     }
-
     if (!$is_recursive) {
         return "
-        <div id='{$field_name}' {$class_string} {$condition_attributes} {$data_name}>
+        <div id='{$field_name}' {$class_string}{$condition_attributes} {$data_name}>
             <h3 style='width:100%'>{$label}</h3>
             <div class='section-fields'>
                 {$subfields_html}
@@ -450,8 +508,9 @@ public static function generateVisualSection($field_name, $field_config, $is_rec
     }
 
     return "
+         <h3>{$label} </h3>
         <div id='{$field_name}' {$class_string} {$condition_attributes} {$data_name}>
-            {$subfields_html}
+                {$subfields_html}
         </div>";
 }
 
@@ -533,11 +592,14 @@ $label = trim($label);
 
 
 public static function generateVisualFieldGroup($field_name, $field_config) {
-    $label     = $field_config['label'] ?? null; // DO NOT auto-generate label
+   
+
+ $label = $field_config['label'] ?? null; 
     $condition = $field_config['condition'] ?? [];
-    $fields    = $field_config['fields'];
+    $fields = $field_config['fields'];
     extract(self::prepareField($field_name, $condition, "dibraco-group"));
-$subfields_html = '';
+    $subfields_html = '';
+
 
     if ($label !==null) {
         $label = ucwords(str_replace(['_', '-'], ' ', $label));
@@ -548,7 +610,7 @@ $subfields_html = '';
 
      foreach ($fields as $subfield_name => $subfield_config) {
        $subfield_config['condition'] = $subfield_config['condition'] ?? [];
-
+        
         switch ($subfield_config['type']) {
             case 'visual_section':
                 $subfields_html .= self::generateVisualSection($subfield_name, $subfield_config, true);
@@ -577,7 +639,7 @@ $subfields_html = '';
 
 }
 public static function generateGroup($field_name, $field_config) {
-    $label     = $field_config['label'] ?? null; // DO NOT auto-generate label
+    $label     = $field_config['label'] ?? null; 
     $condition = $field_config['condition'] ?? [];
     $fields    = $field_config['fields'];
 if (preg_match('/\[\d+\]\[/', $field_name) && substr($field_name, -1) !== ']') {
@@ -606,7 +668,7 @@ $field_name = $normal_field_name ?? $field_name;
     return "
         <div id='{$field_name}' {$class_string} {$condition_attributes} {$data_name}>
             {$label}
-            <div class='group-fields'>{$subfields_html}</div>
+            <div class='group-fields'{$condition_attributes}>{$subfields_html} </div>
         </div>";
 }
 

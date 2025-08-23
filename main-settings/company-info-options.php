@@ -160,6 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['company_info_nonce'])
                         <?= FormHelper::generateField('non_profit_status', ['label' => 'Non Profit?', 'type'  => 'toggle', 'value' => "0"]); ?>
                         <?= FormHelper::generateField('non_profit_type', ['label'=> 'Non Profit Type', 'type' => 'select', 'options' => get_non_profit_type(), 'condition' => ['field' => 'non_profit_status', 'values' => ["1"]]]); ?>
                         <?=FormHelper::generateField('company_description',['type'=>'textarea']);?>
+                        <?= FormHelper::generateField('generate_schema', ['label' => 'Generate Schema?', 'type'  => 'toggle', 'value' => "0"]); ?>
                     </div></div>
                      <?php foreach ($options_config_by_section as $section_key => $section_data){
                                 echo FormHelper::generateVisualSection($section_key, $section_data);
@@ -209,7 +210,7 @@ function handle_save_company_info() {
             $options_to_save[$fieldname] = $value;
         }
     }
-if ($hours_of_operation_data['open_247'] === '1') {
+    if ($hours_of_operation_data['open_247'] === '1') {
         foreach ($day_map as $full_day_name => $abbr) {
             $hours_of_operation_data["{$abbr}_open_hour"] = '';
             $hours_of_operation_data["{$abbr}_close_hour"] = '';
@@ -224,10 +225,15 @@ if ($hours_of_operation_data['open_247'] === '1') {
             }
         }
     }
-
+    if ($options_to_save['place_id']!==''){
+        $place_id = $options_to_save['place_id'];
+        $options_to_save['gmb_map_link']  = 'https://www.google.com/maps/place/?q=place_id:' . urlencode($place_id);
+    }
     $options_to_save['social_media'] = $social_media_data;
     $options_to_save['hours_of_operation'] = $hours_of_operation_data;
-
+    $normal_url = '';
+    $street_url = '';
+    $normal_url ='';
     if (!empty($options_to_save['city']) && !empty($options_to_save['state'])) {
         $geo = get_lat_long_from_osm_2(
             $options_to_save['street_address'],
@@ -235,43 +241,59 @@ if ($hours_of_operation_data['open_247'] === '1') {
             $options_to_save['state'],
             $options_to_save['zipcode']
         );
-        if ($geo) {
+    $street_address = $options_to_save['street_address'];
+    if (!empty( $options_to_save['street_address_2'])){
+        $street_address = "{$options_to_save['street_address']} {$options_to_save['street_address_2']}";
+    }
+    $address_query = implode(', ', array_filter([
+        $options_to_save['name'],
+        $street_address,
+        $options_to_save['city'],
+        $options_to_save['state'],
+        $options_to_save['zipcode']
+    ]));
+    $base_url = 'https://maps.google.com/maps?q=' . urlencode($address_query);
+    $normal_url   = $base_url . '&z=14';
+    $coords_query = '';
+    if ($geo) {
             $options_to_save['latitude'] = $geo['lat'];
             $options_to_save['longitude'] = $geo['long'];
+            $coords_query = $geo['lat'] . ',' . $geo['long'];
         }
+    if ($coords_query !== '') {
+        $streetview_params = ['q'=>$address_query,'cbll'=>$coords_query,'cbp'=>'12,235,,0,5','layer'=>'c','output'=>'svembed'];
+        $street_url = 'https://maps.google.com/maps?q=' . http_build_query($streetview_params);
     }
+    }
+    $options_to_save['normal_map'] = $normal_url;
+    $options_to_save['street_map'] = $street_url;
     update_option('company_info', $options_to_save);
-    $redirect_url = admin_url('admin.php?page=company-info&status=updated');
+    $redirect_url = admin_url('admin.php?page=dibraco-relationships-company-info&status=updated');
     wp_safe_redirect($redirect_url);
     exit;
 }
 
 
 
+
 function get_lat_long_from_osm_2($street = '', $city = '', $state = '', $postal_code = '') {
     $params = [];
-
     if (empty($city) || empty($state)) {
         error_log('OSM Geocoding: Function failed because city or state was empty.');
         return null;
     }
-
     if (!empty($street)) $params['street'] = urlencode($street);
     if (!empty($city)) $params['city'] = urlencode($city);
     if (!empty($state)) $params['state'] = urlencode($state);
     if (!empty($postal_code)) $params['postalcode'] = urlencode($postal_code);
-    
     $params['country'] = 'US';
     $query_string = http_build_query($params);
     $url = "https://nominatim.openstreetmap.org/search?{$query_string}&format=json";
-
-    // Create the simple User-Agent with the site URL
     $args = [
         'headers' => [
             'User-Agent' => 'WordPress/' . home_url(),
         ]
     ];
-    
     $response = wp_remote_get($url, $args);
     
     if (is_wp_error($response)) {
@@ -392,8 +414,18 @@ function register_company_info_shortcodes() {
         }
     }
 
-    // Register dynamic shortcodes for hours_of_operation (nested array)
-    $hours_of_operation = $company_info['hours_of_operation']; 
+
+ if (!empty($company_info['social_media'])) {
+        foreach ($company_info['social_media'] as $platform => $url) {
+            if (!empty($url)) {
+                $shortcode_tag = "company_info_{$platform}";
+                add_shortcode($shortcode_tag, function() use ($url) {
+                    return esc_url($url);
+                });
+            }
+        }
+    }
+	$hours_of_operation = $company_info['hours_of_operation']; 
     foreach ($hours_of_operation as $key => $value) {
         add_shortcode("company_info_hours_of_operation_{$key}", function() use ($key, $company_info) {
             return $company_info['hours_of_operation'][$key]; 
@@ -401,9 +433,7 @@ function register_company_info_shortcodes() {
     }
 }
 
-add_action('after_setup_theme', 'register_company_info_shortcodes');
-
-
+add_action('after_setup_theme', 'register_company_info_shortcodes');   
 
 
 function allow_shortcodes_in_schema_and_paper( $data ) {
@@ -512,12 +542,10 @@ function migrate_company_info_options() {
         }
     }
 
-    // Migrate hours of operation (handle open/close hour mapping)
     $days_of_week = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     $hours_of_operation = [];
 
     foreach ($days_of_week as $day) {
-        // Get the old open and close hour data
         $open_hour = get_option("{$day}_open_hour");
         $close_hour = get_option("{$day}_close_hour");
 
