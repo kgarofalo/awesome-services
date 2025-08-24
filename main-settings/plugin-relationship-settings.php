@@ -61,69 +61,74 @@ function define_initial_individual_contexts() {
     return $contexts;
 }
 
-function assemble_fields($context_name, $context_type, $field_keys = []) {
-    $fields =[];
-    static $post_type_options =null;
-    if ($post_type_options===null){
-    $post_types = get_post_types(['public' => true, '_builtin' => false], 'objects');
-        $post_type_options = [];
-        foreach ($post_types as $post_type => $post_type_obj) {
-        if ($post_type_obj->rewrite !== false) {
-            error_log("Querying for post type: " . $post_type);
-            $post_check_query = new WP_Query(['post_type' => $post_type,'post_status' => 'publish','posts_per_page' => 1,'fields' => 'ids']);
-            if (!empty( $post_check_query->posts)) {
-                $post_type_options[$post_type] = $post_type_obj->label;
+class AesomeServicesRelationship {
+    private static $post_type_options = [];
+    private static $schema_options = [];
+
+    private static function awesome_get_post_types() {
+        $all_post_types = get_post_types(['public' => true, '_builtin' => false], 'objects');
+        $options = [];
+        foreach ($all_post_types as $post_type => $post_type_obj) {
+            if ($post_type_obj->rewrite !== false) {
+                $has_posts = new WP_Query(['post_type' => $post_type, 'post_status' => 'publish', 'posts_per_page' => 1, 'fields' => 'ids', 'no_found_rows' => true,]);
+                if (!empty($has_posts->posts)) {
+                    $options[$post_type] = $post_type_obj->label;
+                }
             }
         }
-    }
-    }
-    $schema_options = initialize_schema_options();
-    //bse fields that are received by all contexts will always have a value select fields values can be set to '' and they will resolve to please select
-    $fields['enabled'] = ['type' => 'toggle', 'label' => "{$context_name} Enabled", 'value' => $field_keys['enabled'] ?? "1"];
-    $fields['schema'] = ['type' => 'select', 'options' => $schema_options, 'value' => $field_keys['schema'] ?? ""];
-    $fields['post_type'] = ['type' => 'select', 'options' => $post_type_options, 'value' => $field_keys['post_type'] ?? ""];
-    //unique fields do not get a primary taxonomy thats what this is. 
-    if ($context_type !== 'unique') {
-        error_log("In assemble_fields: Calling awesome_get_taxonomies_for_post_type()");
-        $taxonomy_options = awesome_get_taxonomies_for_post_type($fields['post_type']['value']);
-        $fields['taxonomy'] = ['type' => 'select', 'options' => $taxonomy_options, 'value' => $field_keys['taxonomy'] ?? ''];
+        return $options;
     }
 
-    if ($context_name === 'locations') {
-        $term_options = getTermOptions($fields['taxonomy']['value']);
-        $fields['main_term'] = ['type' => 'select', 'options' => $term_options, 'value' => $field_keys['main_term'] ?? ''];
-        $fields['ignore_main_term'] = ['type' => 'toggle', 'value'=> $field_keys['ignore_main_term'] ?? "0"];
-    }
+    public static function assemble_fields($context_name, $context_type, $field_keys = []) {
+        $fields = [];
+        
+        if (empty(self::$post_type_options)) {
+            self::$post_type_options = self::awesome_get_post_types();
+            self::$schema_options = initialize_schema_options();
+        }
+        
+        $schema_options = self::$schema_options;
+        $post_type_options = self::$post_type_options;
+        
 
-    $fields['primary_meta'] = ['type' => 'toggle', 'label' => 'Meta', 'value' => $field_keys['primary_meta'] ?? "1"];
-    //fields setup
-    $fields['dibraco_banner'] = ['type' => 'toggle', 'label' => 'Banner', 'value' => $field_keys['dibraco_banner'] ?? "1"];
-     $fields['about_section'] = ['type' => 'toggle', 'label' => 'About Fields', 'value' => $field_keys['about_section'] ?? "1"];
-    $fields['main_sections'] = ['type' => 'toggle', 'label' => 'Main', 'value' => $field_keys['main_sections'] ?? "1"];
-    $fields['contact_section'] = ['type' => 'toggle', 'label' => 'Contact', 'value' => $field_keys['contact_section'] ?? "1"];
-    //images setup
-    $fields['portrait_images'] = ['type' => 'toggle', 'label' => 'Portrait Images', 'value' => $field_keys['portrait_images'] ?? "0"];
-    $fields['repeater_images'] = ['type' => 'toggle', 'label' => 'Landscape Imgs', 'value' => $field_keys['repeater_images'] ?? "1"];
+        $fields['enabled'] = ['type' => 'toggle', 'label' => "{$context_name} Enabled", 'value' => $field_keys['enabled'] ?? "1"];
+        $fields['schema'] = ['type' => 'select', 'options' => $schema_options, 'value' => $field_keys['schema'] ?? ""];
+        $fields['post_type'] = ['type' => 'select', 'options' => $post_type_options, 'value' => $field_keys['post_type'] ?? ""];
+        
+        if ($context_type !== 'unique') {
+            error_log("In assemble_fields: Calling awesome_get_taxonomies_for_post_type()");
+            $taxonomy_options = awesome_get_taxonomies_for_post_type($fields['post_type']['value']);
+            $fields['taxonomy'] = ['type' => 'select', 'options' => $taxonomy_options, 'value' => $field_keys['taxonomy'] ?? ''];
+        }
 
-    if ($context_type === 'type') {
-        //connector context terms will have one post per type term set up in their context tables if this is ==="1" 
-        $fields['post_per_term'] = ['type' => 'toggle', 'label' => '1 Post Per Term', 'value' => $field_keys['post_per_term'] ?? "0"];
-        //additional image field for a specific type will exist on terms but will be fed to posts of that term
-        $fields['term_icon'] = ['type' => 'toggle', 'label' => 'Term Icon', 'value' => $field_keys['term_icon'] ?? "0"];
-        $fields['before_after'] = ['type' => 'toggle', 'label' => 'Bef Aft', 'value' => $field_keys['before_after'] ?? "0"];
-    }
-    //vertification can belong to type posts as well as location terms as well as employee terms
-    if ($context_type === 'type' || $context_name === 'employee' || $context_name === 'locations') {
-        $fields['has_certification'] = ['type' => 'toggle', 'label' => 'Certification', 'value' => $field_keys['has_certification'] ?? "0"];
-    }
-    //only on newly created contexts can this exist
-    if (isset($field_keys['remove'])) {
-        $fields['remove'] = ['type' => 'button', 'class' => 'remove-context-button button-secondary'];
-    }
+        if ($context_name === 'locations') {
+            $term_options = getTermOptions($fields['taxonomy']['value']);
+            $fields['main_term'] = ['type' => 'select', 'options' => $term_options, 'value' => $field_keys['main_term'] ?? ''];
+            $fields['ignore_main_term'] = ['type' => 'toggle', 'value'=> $field_keys['ignore_main_term'] ?? "0"];
+        }
 
-    return $fields;
+        $fields['primary_meta'] = ['type' => 'toggle', 'label' => 'Meta', 'value' => $field_keys['primary_meta'] ?? "1"];
+        $fields['dibraco_banner'] = ['type' => 'toggle', 'label' => 'Banner', 'value' => $field_keys['dibraco_banner'] ?? "1"];
+        $fields['about_section'] = ['type' => 'toggle', 'label' => 'About Fields', 'value' => $field_keys['about_section'] ?? "1"];
+        $fields['main_sections'] = ['type' => 'toggle', 'label' => 'Main', 'value' => $field_keys['main_sections'] ?? "1"];
+        $fields['contact_section'] = ['type' => 'toggle', 'label' => 'Contact', 'value' => $field_keys['contact_section'] ?? "1"];
+        $fields['portrait_images'] = ['type' => 'toggle', 'label' => 'Portrait Images', 'value' => $field_keys['portrait_images'] ?? "0"];
+        $fields['repeater_images'] = ['type' => 'toggle', 'label' => 'Landscape Imgs', 'value' => $field_keys['repeater_images'] ?? "1"];
+
+        if ($context_type === 'type') {
+            $fields['post_per_term'] = ['type' => 'toggle', 'label' => '1 Post Per Term', 'value' => $field_keys['post_per_term'] ?? "0"];
+            $fields['term_icon'] = ['type' => 'toggle', 'label' => 'Term Icon', 'value' => $field_keys['term_icon'] ?? "0"];
+            $fields['before_after'] = ['type' => 'toggle', 'label' => 'Bef Aft', 'value' => $field_keys['before_after'] ?? "0"];
+        }
+        if ($context_type === 'type' || $context_name === 'employee' || $context_name === 'locations') {
+            $fields['has_certification'] = ['type' => 'toggle', 'label' => 'Certification', 'value' => $field_keys['has_certification'] ?? "0"];
+        }
+        if (isset($field_keys['remove'])) {
+            $fields['remove'] = ['type' => 'button', 'class' => 'remove-context-button button-secondary'];
+        }
+        return $fields;
+    }
 }
-
 add_action('wp_ajax_build_individual_context', function() {
     $context_name = $_POST['new_context_name'];
     $context_type = $_POST['new_context_type'];
@@ -133,7 +138,7 @@ add_action('wp_ajax_build_individual_context', function() {
         wp_send_json_error(['message' => 'Context already exists.']);
     }
     $field_keys = ['remove' => []];
-    $new_fields = assemble_fields($context_name, $context_type, $field_keys);
+    $new_fields = AesomeServicesRelationship::assemble_fields($context_name, $context_type, $field_keys);
     $subfields = [];
     $filtered_fields = [];
     foreach ($new_fields as $field_key => $field_data){
@@ -158,23 +163,7 @@ add_action('wp_ajax_build_individual_context', function() {
         'new_section_html' => $new_section_html
     ]);
 });
-function awesome_get_post_types() {
-    if ($post_type_options === null) {
 
-    $post_types = get_post_types(['public' => true, '_builtin' => false], 'objects');
-    $post_type_options = [];
-    foreach ($post_types as $post_type => $post_type_obj) {
-        if ($post_type_obj->rewrite !== false) {
-            error_log("Querying for post type: " . $post_type);
-            $post_check_query = new WP_Query(['post_type' => $post_type,'post_status' => 'publish','posts_per_page' => 1,'fields' => 'ids']);
-            if (!empty( $post_check_query->posts)) {
-                $post_type_options[$post_type] = $post_type_obj->label;
-            }
-        }
-    }
-    }
-    return  $post_type_options;
-}
 function awesome_get_taxonomies_for_post_type($post_type) {
     static $taxonomy_options_cache = [];
     if (!isset($taxonomy_options_cache[$post_type])) {
@@ -219,7 +208,6 @@ function remove_custom_context() {
   wp_send_json_success(['message' => "Context '{$context_name}' removed."]);
 }
 function render_relationships_settings_page() {
-    $start_time = microtime(true);
 
   if ($_SERVER['REQUEST_METHOD'] === 'POST' && wp_verify_nonce($_POST['relationships_settings_nonce'], 'save_relationships_settings')) {
         handle_save_relationships_settings(); 
@@ -249,7 +237,7 @@ function render_relationships_settings_page() {
              'fields' =>[],
              'condition' => ['field' => "{$context_name_string}_enabled", 'values' => ["1"], 'current_value' => '']
             ];
-     $field_keys = assemble_fields($context_name_string, $context_type, $field_keys);
+     $field_keys = AesomeServicesRelationship::assemble_fields($context_name_string, $context_type, $field_keys);
      $filtered_fields = [];
         
       foreach ($field_keys as $field_key => $field_data) {
@@ -298,11 +286,7 @@ function render_relationships_settings_page() {
         <button type="submit" class="button button-primary">Submit</button>
     </form>
     <?php
-    $end_time = microtime(true);
-    $execution_time = ($end_time - $start_time) * 1000000;
-    error_log("Schema generation took " . number_format($execution_time, 2) . " microseconds.");
 }
-
 function handle_save_relationships_settings() {
     if (!wp_verify_nonce($_POST['relationships_settings_nonce'], 'save_relationships_settings')) {
         wp_die('Nonce verification failed or missing nonce.');
