@@ -287,6 +287,7 @@ function render_relationships_settings_page() {
     </form>
     <?php
 }
+
 function handle_save_relationships_settings() {
     if (!wp_verify_nonce($_POST['relationships_settings_nonce'], 'save_relationships_settings')) {
         wp_die('Nonce verification failed or missing nonce.');
@@ -398,27 +399,28 @@ function handle_save_relationships_settings() {
             'taxonomy' => $connector_taxonomy,
             'post_type' => $connector_post_type,
          ];
-         if ($connector_context_name === "locations" && $ignore_main_term !=="1"){
-            $enabled_contexts[$other_name]['related_connectors'][$connector_context_name][] = ['main_term' => $main_term_id];
+         if ($connector_context_name ==='locations'){
+           $enabled_contexts[$other_name]['related_connectors'][$connector_context_name]['main_term'] = $main_term_id;  
          }
-        }        
-    } 
-foreach ($enabled_contexts as $context_name => $context_data) {
-    if ($context_data['context_type'] === 'type' || $context_data['context_type'] === 'unique') {
-        $enabled_contexts[$context_name]['related_connector_count'] = 0;
-        if (!empty($context_data['related_connectors'])) {
-            $related_count = count($context_data['related_connectors']);
-            $enabled_contexts[$context_name]['related_connector_count'] = $related_count;
-            foreach ($context_data['related_connectors'] as $related_connector_name => $connector_info) {
-                if ($context_data['context_type'] === 'type') {
-                    $enabled_contexts[$related_connector_name]['related_type_contexts'][$context_name]['related_connector_count'] = $related_count;
-                } elseif ($context_data['context_type'] === 'unique') {
-                    $enabled_contexts[$related_connector_name]['related_unique_contexts'][$context_name]['related_connector_count'] = $related_count;
+         }
+        }  
+         
+    foreach ($enabled_contexts as $context_name => $context_data) {
+        if ($context_data['context_type'] === 'type' || $context_data['context_type'] === 'unique') {
+            $enabled_contexts[$context_name]['related_connector_count'] = 0;
+            if (!empty($context_data['related_connectors'])) {
+                $related_count = count($context_data['related_connectors']);
+                $enabled_contexts[$context_name]['related_connector_count'] = $related_count;
+                foreach ($context_data['related_connectors'] as $related_connector_name => $connector_info) {
+                    if ($context_data['context_type'] === 'type') {
+                        $enabled_contexts[$related_connector_name]['related_type_contexts'][$context_name]['related_connector_count'] = $related_count;
+                    } elseif ($context_data['context_type'] === 'unique') {
+                        $enabled_contexts[$related_connector_name]['related_unique_contexts'][$context_name]['related_connector_count'] = $related_count;
+                    }
                 }
             }
         }
-    }
-}    
+    }    
 
 
 $status = 'none';
