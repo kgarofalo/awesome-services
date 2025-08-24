@@ -600,11 +600,6 @@ function dibraco_get_related_post_ids($post_type, $tax_query, $posts_per_page = 
     return get_posts($query_args);
 }
 
-/**
- * Normalize any "term IDs" input into a flat, numeric array of ints.
- * Accepts: ints, strings, CSV, plain arrays, or associative arrays.
- * If associative, we treat the **keys** as the term IDs.
- */
 function dibraco_int_all_terms($terms) {
     $first_item = reset($terms);
     if (is_object($first_item)) {
@@ -619,87 +614,88 @@ function dibraco_int_all_terms($terms) {
     }
     return $processed;
 }
+
+
 function get_main_posts_for_options($context_data) {
     $context_name = $context_data['context_name'];
     $type_taxonomy = $context_data['taxonomy'];
-    $type_post_type =$context_data['post_type'];
+    $type_post_type = $context_data['post_type'];
     $type_term_ids = get_terms(['taxonomy' => $type_taxonomy, 'hide_empty' => true, 'fields' => 'ids']);
     $type_term_ids = dibraco_int_all_terms($type_term_ids);
     $number_of_type_terms = count($type_term_ids);
     $related_connector_count = $context_data['related_connector_count'];
-    if ($related_connector_count ===2 ){
+    if ($related_connector_count === 2) {
         $locations_context = $context_data['related_connectors']['locations'];
         $locations_taxonomy = $locations_context['taxonomy'];
-        $ignore_main_term = $locations_context['ignore_main_term'];
-        if ($ignore_main_term ==="1"){
-        $locations_main_term = $locations_context['main_term'] ?? '';
-        }
+        $location_main_term = $locations_context['main_term'];
     }
     $main_post_map = get_option("{$context_name}_main_posts");
     if (!empty($main_post_map)) {
         $main_post_map = validate_main_post_type_map($main_post_map, $type_taxonomy);
         $number_of_pairs = count($main_post_map);
-        if ($number_of_type_terms !==$number_of_pairs){
+
+        if ($number_of_type_terms !== $number_of_pairs) {
             $terms_with_posts = array_keys($main_post_map);
             $type_term_ids = array_diff($type_term_ids, $terms_with_posts);
         } else {
             update_option("{$context_name}_main_posts", $main_post_map);
             return;
         }
-    }   
-    if (!empty($type_term_ids)){
+    }
+    if (!empty($type_term_ids)) {
         $taxonomy_in_page = in_array($type_taxonomy, get_object_taxonomies('page', 'names'), true) || in_array('page', get_taxonomy($type_taxonomy)->object_type, true);
-         foreach ($type_term_ids as $type_term_id) {
+
+        foreach ($type_term_ids as $type_term_id) {
             $main_post_id = figure_out_main_post_for_term($type_term_id, $type_post_type);
             $main_post = '';
             $base_tax_query = [['taxonomy' => $type_taxonomy, 'field' => 'term_id', 'terms' => $type_term_id]];
+
             if ($taxonomy_in_page) {
                 $main_post = dibraco_get_related_post_ids('page', $base_tax_query, 1, 'ids');
             }
-             if (empty($main_post)) {
+            if (empty($main_post)) {
                 if ($related_connector_count === 2) {
-                    if (!empty($locations_main_term)) {
+                    if (!empty($location_main_term)) {
                         $specific_tax_query = [
                             'relation' => 'AND',
                             $base_tax_query[0],
-                            ['taxonomy' => $locations_taxonomy, 'field' => 'term_id', 'terms' => $locations_main_term],
+                            ['taxonomy' => $locations_taxonomy, 'field' => 'term_id', 'terms' => $location_main_term],
                         ];
                         $main_post = dibraco_get_related_post_ids($type_post_type, $specific_tax_query, 1, 'ids');
                     }
-                   if (empty($main_post)) {
-                        $any_location_tax_query = ['relation' => 'AND', $base_tax_query[0],
-                            ['taxonomy' => $locations_taxonomy, 'operator' => 'EXISTS'], ];
+                    if (empty($main_post)) {
+                        $any_location_tax_query = ['relation' => 'AND', $base_tax_query[0], ['taxonomy' => $locations_taxonomy, 'operator' => 'EXISTS']];
                         $main_post = dibraco_get_related_post_ids($type_post_type, $any_location_tax_query, 1, 'ids');
                     }
                 }
                 if (empty($main_post)) {
                     $main_post = dibraco_get_related_post_ids($type_post_type, $base_tax_query, 1, 'ids');
-                        if (empty($main_post)) {
+                    if (empty($main_post)) {
                         $main_post = dibraco_get_related_post_ids('any', $base_tax_query, 1, 'ids');
                     }
                 }
                 $main_post_id = (int) $main_post[0];
                 update_term_meta($type_term_id, 'main_post_for_term', $main_post_id);
                 $main_post_map[$type_term_id] = $main_post_id;
-               
             }
-         }
-         $option_name = "{$context_name}_main_posts";
-         update_option($option_name, $main_post_map);
-         return;
+        }
+        $option_name = "{$context_name}_main_posts";
+        update_option($option_name, $main_post_map);
+        return;
     }
-return; //catchall return
+    return;
 }
 
-function validate_main_post_type_map($main_post_map, $type_taxonomy){
-    $verified_pairs=[];
+function validate_main_post_type_map($main_post_map, $type_taxonomy) {
+    $verified_pairs = [];
     foreach ($main_post_map as $type_term_id => $post_id) {
         $type_term_id = (int)$type_term_id;
         $post_id = (int)$post_id;
-        $post_status= get_post_status($post_id); 
-        if ($post_status ==='publish' && term_exists($type_term_id)){
+        $post_status = get_post_status($post_id);
+
+        if ($post_status === 'publish' && term_exists($type_term_id)) {
             $posts_type_term_id = dibraco_get_current_term_id_for_post($post_id, $type_taxonomy);
-            if ($type_term_id !==$posts_type_term_id){
+            if ($type_term_id !== $posts_type_term_id) {
                 update_term_meta($type_term_id, 'main_post_for_term', '');
                 continue;
             } else {
@@ -711,6 +707,8 @@ function validate_main_post_type_map($main_post_map, $type_taxonomy){
     }
     return $verified_pairs;
 }
+
+
 
 function setup_connected_unique_posts($connector_taxonomy, $unique_post_type, $unique_context_name) {
     $related_unique_meta_key = "related_unique_{$unique_context_name}";
@@ -761,14 +759,14 @@ function dibraco_get_all_type_term_fallback_urls($source, $related_type_context_
 function dibraco_setup_type_post_list_with_fallback($connector_taxonomy, $type_post_type, $type_taxonomy, $related_connector_count, $related_type_context_name, $service_area_taxonomy_for_locations = '') {
     $connector_terms = get_terms(['taxonomy' => $connector_taxonomy, 'hide_empty' => false, 'fields' => 'id=>name']);
     $type_terms = get_terms(['taxonomy' => $type_taxonomy, 'hide_empty' => true, 'fields' => 'id=>name']);
-    foreach ($connector_terms as $connector_id => $connector_term_name) {
+    foreach ($connector_terms as $connector_term_id => $connector_term_name) {
     $related_type_meta_key = "related_type_{$related_type_context_name}";
-        $connector_id =(int)$connector_id;
+        $connector_term_id =(int)$connector_term_id;
         $entries = [];
         $fallback_source = 'options';
         if ($related_connector_count===2 && $service_area_taxonomy_for_locations ===''){
-            $area_parent_location_term = get_term_meta($connector_id, 'area_parent_location_term', true);
-            if (!empty($area_parent_location_term)){
+            $area_parent_location_term = get_term_meta($connector_term_id, 'area_parent_location_term', true);
+        if (!empty($area_parent_location_term)){
             $area_parent_location_term = (int)$area_parent_location_term;
             $fallback_source = $area_parent_location_term;
         }
@@ -778,7 +776,7 @@ function dibraco_setup_type_post_list_with_fallback($connector_taxonomy, $type_p
             $type_id = (int)$type_id;
             $specific_tax_query = [
                 'relation' => 'AND',
-                ['taxonomy' => $connector_taxonomy, 'field' => 'term_id', 'terms' => $connector_id],
+                ['taxonomy' => $connector_taxonomy, 'field' => 'term_id', 'terms' => $connector_term_id],
                 ['taxonomy' => $type_taxonomy,      'field' => 'term_id', 'terms' => $type_id],
             ];
             if ($service_area_taxonomy_for_locations !== '') {
@@ -791,7 +789,7 @@ function dibraco_setup_type_post_list_with_fallback($connector_taxonomy, $type_p
                 $post_id = $found_posts[0];
                 $post_url = get_permalink($post_id);
             }
-           $fallback_url= $fallback_urls_array[$type_id]['fallback_url'];
+            $fallback_url= $fallback_urls_array[$type_id]['fallback_url'];
             $entries[$type_id] = [
                 'related_post_title' => "{$type_term_name} In {$connector_term_name}",
                 'related_post_id'    => $post_id,
@@ -799,7 +797,7 @@ function dibraco_setup_type_post_list_with_fallback($connector_taxonomy, $type_p
                 'fallback_url'       => $fallback_url,
             ];
         }
-        update_term_meta($connector_id, $related_type_meta_key, $entries);
+        update_term_meta($connector_term_id, $related_type_meta_key, $entries);
     }
 }
 function setup_connected_type_posts_no_fallback($connector_taxonomy, $type_post_type, $type_taxonomy, $related_type_meta_key) {
@@ -1031,10 +1029,7 @@ add_meta_box(
              add_action("{$taxonomy}_edit_form_fields", 'render_dibraco_term_fields', 10, 1);
              add_action("edited_{$taxonomy}", 'save_dibraco_general_term_fields', 5, 1);
         }
-        
-
-      
-            if($context_name === 'service_areas') {
+    if($context_name === 'service_areas') {
                 $related_type_contexts = $context_data['related_type_contexts'];
                 add_action("created_{$taxonomy}", function($term_id) use($related_type_contexts, $taxonomy) {
                 setup_related_type_terms_for_new_connector_term($term_id, $related_type_contexts, $context_name, $taxonomy);}, 11, 1);
@@ -1043,7 +1038,7 @@ add_meta_box(
                 add_action( "edited_{$taxonomy}", function($term_id) use ($context_data) {
                 handle_save_service_area_term_related_types($term_id,$_POST,$context_data );}, 10, 1 );
             }
-            if($context_name ==='locations' && $primary_meta==="1"){
+    if($context_name ==='locations' && $primary_meta==="1"){
                 $related_type_contexts = $context_data['related_type_contexts'];
                 add_action("created_{$taxonomy}", function($term_id) use($related_type_contexts, $taxonomy) {
                 setup_related_type_terms_for_new_connector_term($term_id, $related_type_contexts, $context_name, $taxonomy);}, 11, 1);
@@ -1053,7 +1048,7 @@ add_meta_box(
                 add_action("edited_{$taxonomy}", function($term_id) use ($taxonomy) {
                 handle_save_location_term_meta($term_id, $taxonomy);}, 25, 1);
             }
-            if($context_name ==='jobs'){
+    if($context_name ==='jobs'){
              add_meta_box('job_meta_box', 'Jobs Custom Fields', 'display_job_meta_box', $post_type, 'normal', 'high');
              add_action("save_post_{$post_type}", 'save_job_meta_box_data', 20);
              add_action("load-post.php", function() {
@@ -1420,7 +1415,7 @@ function save_related_connector_terms_to_unique($post_id, $context_data, $relate
     foreach ($related_connectors as $connector_key => $connector_data) {
         $taxonomy        = $connector_data['taxonomy'];
         $current_term_id = dibraco_get_current_term_id_for_post($post_id, $taxonomy);
-        $new_term_id     = isset($_POST["{$taxonomy}_term"]) ? (int)$_POST["{$taxonomy}_term"] : '';
+        $new_term_id     = (int)$_POST["{$taxonomy}_term"];
         if ($new_term_id === $current_term_id) {
             continue;
         }
@@ -1432,9 +1427,6 @@ function save_related_connector_terms_to_unique($post_id, $context_data, $relate
         }
         if ($new_term_id !=='') {
             $new_meta = get_term_meta($new_term_id, $meta_key, true);
-            if (!is_array($new_meta)) {
-                $new_meta = [];
-            }
             $new_term_id = (int)$new_term_id;
             $new_meta[$post_id] = [
                 'related_post_id'    => $post_id,
@@ -1447,34 +1439,8 @@ function save_related_connector_terms_to_unique($post_id, $context_data, $relate
         wp_set_object_terms($post_id, $new_term_id, $taxonomy, false);
     }
 }
-/*
-Related To Connector Contexts - Front End Data Tables Relationship is created by wordpress and lasts unless settings are changed and saved
-This is the blueprint for the backend admin/database
-Only Related Title Is Editable By The User and it staats with a default or 
-Meta Data Array Key = "related_unique_{$unique_context_name}"
-Unique Context Data Tables On Conncetors
-$related_unique_context[$post_id['related_title', 'related_post_id', 'related_url']]
-Headers - Related Title / Related Url
-Type Context Data Tables On Connectors
-Meta Data Array Key = "related_type_{$type_context_name}"
-if $context['post_per_term']==="1"{
-//Each Type Term Will Have 1 main post id - this represents the fallback Unless Related Connectors ==="2" - then the fallback for service areas is derivced hierarchically Main Post => Location, Location => Service Area
-$related_trype_context[$term_id[['related_title', 'related_post_id', 'related_url', 'fallback_url']] 1 must exist per type term for each connector term **fallback will always exist
-Row Index Id - 'type_term_id'
-Headers - Type Term Name**nothing Under**, Title, Related URL, Fallback URL
-Table Data - 'related_title' 'related_url 'fallback_url' **'related_post_id'**invisible
-}
-if $context['post_per_term']!=="1"{
-$related_trype_context[$term_id[$post_id =>['related_title', 'related_post_id, 'related_url']]] 1 row must exist per type term for each connector term sub rows need not exist, but internal array will remain open 
-$term_id[] <--default row
-Row Index Id - type_term_id
-Sub Row Index Id - 'related_post_id'
-Headers - Type Term Name**Main Row Header
-SubRow Headers - Title, Related URL
-}
-*/
+
 function dibraco_admin_table_template($title_config, $headers, $styles, $rows, $colspan) {
-    // 1. Title Configuration
     $title_tag   = $title_config['tag'] ?? 'h2';
     $title_style = $title_config['style'] ?? 'margin-bottom:0.5em;';
     $title_text  = $title_config['text'] ?? '';
@@ -1485,7 +1451,6 @@ function dibraco_admin_table_template($title_config, $headers, $styles, $rows, $
     <?php if (!empty($title_text)) : ?>
         <<?php echo $title_tag; ?> style="<?php echo esc_attr($title_style); ?>"><?php echo esc_html($title_text); ?></<?php echo $title_tag; ?>>
     <?php endif; ?>
-
     <table class="wp-list-table widefat striped" style="table-layout: fixed;">
         
         <thead>
@@ -1606,79 +1571,90 @@ function prepare_single_type_table_data($related_type_context_name, $type_contex
     $rows_from_meta = get_term_meta($current_connector_term_id, $related_type_meta_key, true);
     $related_type_taxonomy = $type_context_data['taxonomy'];
     $post_per_term = $type_context_data['post_per_term'];
-
     $all_terms_in_taxonomy = get_terms(['taxonomy' => $related_type_taxonomy, 'hide_empty' => true, 'fields' => 'id=>name']);
-
     $table_rows = [];
-
-    if ($post_per_term === "1") {
-        foreach ($all_terms_in_taxonomy as $type_term_id => $type_term_name) {
-           $type_term_id =(int)$type_term_id;
-            $entry_data = $rows_from_meta[$type_term_id];
-            $row_name = "{$related_type_meta_key}[{$type_term_id}]";
-            
-            $existing_data = [
-               $entry_data['related_post_title'] => 'related_post_title',
-                $entry_data['related_post_id'] => 'related_post_id',
-                $entry_data['related_post_url'] => 'related_post_url',
-                $entry_data['fallback_url'] => 'fallback_url'
-            ];
-            $table_rows[$type_term_id] = $existing_data;
-        }
-    } else {
-        foreach ($all_terms_in_taxonomy as $type_term_id => $type_term_name) {
-            $posts_for_this_term = $rows_from_meta[$type_term_id];
-
-            foreach ($posts_for_this_term as $post_id => $post_data) {
-                $row_name = "{$related_type_meta_key}[{$type_term_id}][{$post_id}]";
-                $entry_data = [
-                    'related_post_title' => $post_data['related_post_title'],
-                    'related_post_id' => $post_data['related_post_id'],
-                    'related_post_url' => $post_data['related_post_url'],
-                ];
-                $table_rows[$type_term_id][] = $entry_data;
-            }
-        }
-    }
-  $headers = [];
-    $styles = [];
     if ($post_per_term === "1") {
         $headers = ['Type Term Name', 'Title', 'Related URL', 'Fallback URL'];
-        $styles = ['width:15%', 'width:35%', 'width:25%', 'width:25%'];
+       $styles = ['width:15%', 'width:35%', 'width:25%', 'width:25%'];
+        foreach ($all_terms_in_taxonomy as $type_term_id => $type_term_name) {
+            $entry_data = $rows_from_meta[$type_term_id];
+            $row_name = "{$related_type_meta_key}[{$type_term_id}]";
+            $table_rows[] = [
+                'cells' => [$type_term_name,[
+                        'is_editable'   => true,
+                        'name'=> "{$row_name}[related_post_title]",
+                        'value' => $entry_data['related_post_title'],
+                        'hidden_fields' => ["{$row_name}[related_post_id]" => $entry_data['related_post_id']]
+                    ],
+                    $entry_data['related_post_url'],
+                    $entry_data['fallback_url']
+                ]
+            ];
+        }
     } else {
         $headers = ['Type Term Name', 'Title', 'Related URL'];
         $styles = ['width:20%', 'width:40%', 'width:40%'];
-    }
+        foreach ($all_terms_in_taxonomy as $type_term_id => $type_term_name) {
+            $posts_for_this_term = $rows_from_meta[$type_term_id];
+            if (!empty($posts_for_this_term)) {
+            $first_post_in_group = true;
+            foreach ($posts_for_this_term as $post_id => $entry_data) {
+                $row_name = "{$related_type_meta_key}[{$type_term_id}][{$post_id}]";
+                $row_cells = [];
+                if ($first_post_in_group) {
+                    $row_cells[] = ['content' => $type_term_name, 'rowspan' => count($posts_for_this_term)];
+                    $first_post_in_group = false;
+                }
+                $row_cells[] = [
+                    'is_editable'   => true,
+                    'name'          => "{$row_name}[related_post_title]",
+                    'value'         => $entry_data['related_post_title'],
+                    'hidden_fields' => [
+                         "{$row_name}[related_post_id]" => $entry_data['related_post_id'],
+                    ]
+                ];
+                $row_cells[] = $entry_data['related_post_url'];
 
+                $table_rows[] = ['cells' => $row_cells];
+            }
+        }
+        }
+    }
     return [
-        'title' => 'Related ' . ucwords(str_replace('_', ' ', $related_type_context_name)) . ' Posts',
+        'title'   => 'Related ' . ucwords(str_replace('_', ' ', $related_type_context_name)) . ' Posts',
         'headers' => $headers,
-        'styles' => $styles,
-        'rows' => $table_rows,
-        'colspan'
+        'styles'  => $styles,
+        'rows'    => $table_rows,
+        'colspan' => count($headers)
     ];
 }
+
 
 function prepare_single_unique_table_data($unique_context_name, $unique_context_data, $current_connector_term_id) {
     $related_unique_meta_key = "related_unique_{$unique_context_name}";
     $unique_posts_data = get_term_meta($current_connector_term_id, $related_unique_meta_key, true);
-    if (empty($unique_posts_data)) {return;}
     $table_rows = [];
     foreach ($unique_posts_data as $post_id => $post_data) {
         $row_name = "{$related_unique_meta_key}[{$post_id}]";
-        $cell1 = '<td><input type="text" style="width:100%" name="' . esc_attr($row_name) . '[related_post_title]" value="' . esc_attr($post_data['related_post_title']) . '" />' .
-                 '<input type="hidden" name="' . esc_attr($row_name) . '[related_post_url]" value="' . esc_attr($post_data['related_post_url']) . '" />' .
-                 '<input type="hidden" name="' . esc_attr($row_name) . '[related_post_id]" value="' . esc_attr($post_id) . '" /></td>';
-        $cell2 = '<td>' . esc_html($post_data['related_post_url']) . '</td>';
-        $table_rows[] = [$cell1, $cell2];
+        $title_cell = [
+            'is_editable'   => true,
+            'name'          => "{$row_name}[related_post_title]",
+            'value'         => $post_data['related_post_title'],
+            'hidden_fields' => [
+                "{$row_name}[related_post_url]" => $post_data['related_post_url'],
+                "{$row_name}[related_post_id]"  => $post_id,
+            ]
+        ];
+        $url_cell = $post_data['related_post_url'];
+        $table_rows[] = ['cells' => [$title_cell, $url_cell]];
     }
     return [
         'title'   => 'Related ' . ucwords(str_replace('_', ' ', $unique_context_name)) . ' Posts',
         'headers' => ['Title', 'URL'],
         'styles'  => ['width:40%', 'width:60%'],
         'rows'    => $table_rows,
-         'colspan' => 6,
-        ];
+        'colspan' => 2,
+    ];
 }
 
 function pre_render_meta_box($post, $args) {
