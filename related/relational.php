@@ -101,13 +101,13 @@ function save_location_connection_for_area_terms($area_term_id, $tt_id) {
     $act_slug = get_term($act_int)->slug;
     $assignments = get_option('act_to_lct_assignments', []);
     $assigned_slugs = get_option('act_to_lct_slug_assignments', []);
-        if (isset($assignments[$area_term_id])) {
+    if (isset($assignments[$area_term_id])) {
         $current_associated_lct_database_term = $assignments[$area_term_id];
         $current_associated_lct_term_slug = $assigned_slugs[$act_slug];
     } else {
         $current_associated_lct_database_term = '';
-        $current_associated_lct_term_slug = '';
         update_act_assignments($area_term_id, '');
+        
     }
     if ($new_lct_id === '0' || $new_lct_id === 0 || empty($new_lct_id)) {
         update_term_meta($area_term_id, 'area_parent_location_term', '');
@@ -115,7 +115,7 @@ function save_location_connection_for_area_terms($area_term_id, $tt_id) {
         update_term_meta($area_term_id, 'area_parent_location_slug', '');
         if ($current_associated_lct_database_term!=='') {
             $old_associated_act_terms = get_term_meta($current_associated_lct_database_term, 'associated_act_terms', true) ?: [];
-            $old_associated_act_term_slugs = get_term_meta($current_associated_lct_database_term, 'associated_act_terms', true) ?: [];
+            $old_associated_act_term_slugs = get_term_meta($current_associated_lct_database_term, 'associated_act_slugs', true) ?: [];
             if (($key = array_search($area_term_id, $old_associated_act_terms)) !== false) {
                 unset($old_associated_act_terms[$key]);
                 update_term_meta($current_associated_lct_database_term, 'associated_act_terms', $old_associated_act_terms);
@@ -150,71 +150,10 @@ function save_location_connection_for_area_terms($area_term_id, $tt_id) {
 
     update_act_assignments($area_term_id, $new_lct_id);
 }
-/*
-function render_area_connection_checkboxes_for_location_terms($location_term, $locations_connector_taxonomy) {
- if($location_term ) {
-  $current_lct_term_id = (int)$location_term->term_id;
-    $current_lct_term_id = $location_term->term_id;
-    $current_lct_associated_area_term_ids = get_term_meta($current_lct_term_id, 'associated_act_terms', true);
-    $current_lct_associated_area_term_slugs = get_term_meta($current_lct_term_id, 'associated_act_slugs', true);
- }
- 
-  $area_connector_tax = get_option('enabled_connector_contexts')['service_areas']['taxonomy'];
-  $act_terms = get_terms(['taxonomy' => $area_connector_tax, 'hide_empty' => false, 'fields' => 'id=>name']);
-  $assignments =  get_option('act_to_lct_assignments', []);
-  $slug_assignments = get_option('act_to_lct_slug_assignments',[]);
-  $assigned_act_ids = [];
-  $selected_terms = [];
-  foreach ($assignments as $act_id => $lct_id) {
-   if ($lct_id !== '') { 
-    $assigned_act_ids[] = $act_id;
-    }
-    if ($current_lct_term_id !== null && $current_lct_term_id === $lct_id) {
-        $selected_terms[] = $act_id;
-    } 
-  }
-    ?>
- <table class="form-table dibraco-term-form-table widefat">
-  <tr>
-    <?= '<p><strong>Associated Area Connector Terms:</strong></p>';
-    $current_lct_associated_area_term_slugs = implode(', ', $current_lct_associated_area_term_slugs);
 
-echo "<div><strong>Slugs A:</strong> $current_lct_associated_area_term_slugs</div>";
-    ?> <td>
-     <?php $renderedOne = false;  ?>
-    <?php foreach ($act_terms as $act_id => $act_name){
-        $act_term = get_term($act_id, $area_connector_tax);
-        $act_slug = $act_term->slug;
-        $is_slug_synced = in_array($act_slug, (array)$current_lct_associated_area_term_slugs);
-                    if (!in_array($act_id, $assigned_act_ids, true) || in_array($act_id, $selected_terms, true)) {
-                        $renderedOne = true;
-                        $checked = in_array($act_id, $selected_terms, true);
-                        $input_id = "associated_act_term_{$act_id}";
-                    ?>
-                        <label for="<?= $input_id; ?>">
-                            <input type="checkbox" id="<?= $input_id; ?>" name="associated_act_terms[]" value="<?= $act_id; ?>"
-                                <?= $checked ? 'checked="checked"' : ''; ?>>
-                            <?= esc_html($act_name); ?>
-                            <?php if ($is_slug_synced) { ?>
-                                <span style="color: green;">(Slugs Synced)</span>
-                            <?php } else { ?>
-                                <span style="color: red;">(Slugs Not Synced)</span>
-                            <?php } ?>
-                        </label><br>
-                    <?php }
-                } ?>
-            <?php if (!$renderedOne) { ?>
-                    <?= '<p>No area terms available.</p>'; ?>
-                <?php } ?>
-    </td>
-  </tr>
-</table>
-    <?php
-}*/
 function render_area_connection_checkboxes_for_location_terms($location_term, $locations_connector_taxonomy) { 
     $area_connector_tax = get_option('enabled_connector_contexts')['service_areas']['taxonomy'];
-$taxonomy_human_readable = ucwords(str_replace(['-', '_'], ' ', $area_connector_tax));
-
+    $taxonomy_human_readable = ucwords(str_replace(['-', '_'], ' ', $area_connector_tax));
     $all_act_terms = get_terms(['taxonomy' => $area_connector_tax, 'hide_empty' => false, 'fields' => 'id=>name']);
     $assignments = get_option('act_to_lct_assignments', []);
     $assigned_act_ids =[];
@@ -240,40 +179,40 @@ $taxonomy_human_readable = ucwords(str_replace(['-', '_'], ' ', $area_connector_
        }
     }
     $terms_to_display = $selected_terms + $unassigned_act_ids;
-    if (!empty($terms_to_display)) {
-$rows = [];
-$cols_per_row = 4;
-$current_row = [];
+    ksort($terms_to_display);
 
-foreach ($terms_to_display as $act_id => $act_name) {
-    $is_selected = array_key_exists($act_id, $selected_terms);
-    $input_id = "associated_act_term_{$act_id}";
-    $checkbox_html = '<input type="checkbox" id="'.$input_id.'" name="associated_act_terms[]" value="'.$act_id.'"'.checked($is_selected, true, false).'>';
-    $label_html = '<label for="'.$input_id.'">'.$act_name.'</label>';
-    $current_row[] = $checkbox_html.' '.$label_html;
-
-    if (count($current_row) === $cols_per_row) {
-        $rows[] = $current_row;
-        $current_row = [];
+    if (empty($terms_to_display)) {
+        echo '<p>No service areas are available to be assigned.</p>';
+        return;
     }
-}
-
-if (!empty($current_row)) {
-    while (count($current_row) < $cols_per_row) {
-        $current_row[] = '';
+    $checkbox_options = [];
+    foreach ($terms_to_display as $act_id => $act_name) {
+        $checkbox_options[] = [
+            'value'   => $act_id,
+            'label'   => $act_name,
+            'checked' => array_key_exists($act_id, $selected_terms)
+        ];
     }
-    $rows[] = $current_row;
-}
-   $table = [
-    'title'   => '',
-    'headers' => [$taxonomy_human_readable, '&nbsp;', '&nbsp;', '&nbsp;'],
-    'styles'  => ['width:25%','width:25%','width:25%','width:25%'],
-    'rows'    => $rows,
+
+    $table = [
+        'title'   => 'Associated Service Areas',
+        'headers' => [$taxonomy_human_readable],
+        'styles'  => ['width:100%'],
+        'rows'    => [
+            [
+                'cells' => [
+                    [
+                        'type'    => 'checkbox_list',
+                        'name'    => 'associated_act_terms[]',
+                        'options' => $checkbox_options
+                    ]
+                ]
+            ]
+        ],
+        'colspan' => 1
     ];
+
     render_dibraco_admin_table($table);
-} else {
-    echo '<p>No service areas are available to be assigned.</p>';
-}
 }
 function save_area_connections_for_location_terms($term_id, $tt_id) {
     $term = get_term($term_id);
@@ -319,7 +258,7 @@ function update_act_assignments($act_id, $lct_id = null) {
     if ($lct_id === null || $lct_id === '' || $lct_id === 0) {
         $assignments[$act_id] = '';
         $assigned_slugs[$act_slug]='';
-    } else {
+    } elseif($act_id ==='') {
         $assignments[$act_id] = (int)$lct_id;
         $assigned_slugs[$act_slug] = get_term($lct_id)->slug;
     }
