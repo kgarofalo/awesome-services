@@ -1,79 +1,62 @@
 <?php
-add_action('admin_menu', function () {
-    $jobs_post_type = get_option('enabled_type_contexts')['jobs']['post_type'] ?? null;
-    if (!$jobs_post_type) {
-        return;
-    }
-    $parent_slugs = [
-        "edit.php?post_type={$jobs_post_type}", // Jobs post type menu
-        'relationships',                       // Relationships menu
-    ];
-    foreach ($parent_slugs as $parent_slug) {
-        add_submenu_page(
-            $parent_slug,
-            'Manage Job Benefits',
-            'Job Benefits',
-            'manage_options',
-            'manage-global-benefits',
-            'render_global_benefits_page'
-        );
-    }
-}, 20);
 
+function get_global_benefit_fields() {
+ $default_benefit_field_names = ['health_benefits', 'paid_time_off', 'retirement_plan', 'flexible_schedule', '401_k', 'tuition_reimbursement'];
+
+ $field_names =  get_option('global_benefits', []);
+  if (empty($field_names)){    
+    $field_names = $default_benefit_field_names;
+  }
+   $fields = [];
+    foreach ($field_names as $field_name) {
+        $field_config = ['type' => 'checkbox', 'value' => '0'];
+       $fields[$field_name] = $field_config;
+    }
+    return $fields;
+}
 function render_global_benefits_page() {
-    $default_benefits = [
-        'health_benefits' => 'Health Insurance',
-        'paid_time_off' => 'Paid Time Off',
-        'retirement_plan' => 'Retirement Plan',
-        'flexible_schedule' => 'Flexible Schedule',
-        'tuition_reimbursement' => 'Tuition Reimbursement',
-    ];
-    $global_benefits = get_option('global_benefits', $default_benefits);
-    if (empty($global_benefits)) {
-        update_option('global_benefits', $default_benefits);
-    }
+  $default_benefit_field_names = ['health_benefits', 'paid_time_off', 'retirement_plan', 'flexible_schedule', '401_k', 'tuition_reimbursement'];
 
-    // Handle form submissions for adding or removing benefits
+  $option_key = 'global_benefits';
+  $field_names =  get_option($option_key, []);
+    if (empty($field_names)){    
+    $field_names = $default_benefit_field_names;
+    }
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // Handle adding a new benefit
-        if (!empty($_POST['new_benefit']) && $_POST['action'] === 'add') {
-            $new_benefit = $_POST['new_benefit'];
-            $benefit_key = strtolower(str_replace(' ', '_', $new_benefit));
-            if (!isset($global_benefits[$benefit_key])) {
-                $global_benefits[$benefit_key] = $new_benefit;
-                update_option('global_benefits', $global_benefits);
+        if (isset($_POST['add'])) {
+            $new_field_name = strtolower(str_replace(' ', '_', sanitize_text_field( $_POST['new_job_benefit_field'])));
+             if (($new_field_name !== '') && (!in_array($new_field_name, $field_names))) {
+                 $field_names[$new_field_name] = $new_field_name;
+                 }
             }
-        }
-
-        foreach ($global_benefits as $key => $benefit) {
-            if (isset($_POST[$key])) {  
-                unset($global_benefits[$key]); 
-                update_option('global_benefits', $global_benefits);  
+        if (isset($_POST['delete'])) {
+             unset($field_names[$_POST['delete']]);
             }
-        }
-    }
+           update_option($option_key, $field_names);
+         }
 
     ?>
-    <form method="post">
-        <p><label for="new_benefit">Add New Benefit:</label><br />
-        <input type="text" name="new_benefit" class="regular-text" required>
-        <input type="hidden" name="action" value="add">
-        <input type="submit" value="Add Benefit" class="button button-primary"></p>
-    </form>
-
-    <h2>Available Benefits</h2>
-    <ul style="list-style-type: none; padding-left: 0;">
-        <?php foreach ($global_benefits as $key => $benefit): ?>
-            <li style="margin-bottom: 10px; display: flex; justify-content: flex-start; align-items: center;">
-                <span style="margin-right: 10px;"><?php echo $benefit; ?></span>
-                <form method="post" style="margin: 0;">
-                    <!-- The benefit key is used directly as the name for the input field -->
-                    <input type="hidden" name="<?= $key ?>" value="<?= $key ?>"> <!-- The field name is the benefit key -->
-                    <button type="submit" style="font-size: 12px; background: none; color: #f44336; border: none; cursor: pointer; text-decoration: underline; padding: 0; margin-left: 10px;">Remove</button>
-                </form>
-            </li>
-        <?php endforeach; ?>
-    </ul>
+     <div class="wrap">
+         <h1>Job Posting Benefits</h1>
+         <form method="post">
+              <p><label for="new_benefit">Add New Benefit:</label><br />
+             <?= FormHelper::generateField('new_job_benefit_field', ['type' => 'text']); ?>
+             <button type="submit" name="add" value="new_job_benefit_field" class="button button-primary">Add New Field</button>
+              <hr>
+               <h2>Available Benefits</h2>
+                <ul style="list-style-type: none; padding-left: 0;">
+                 <? foreach ($field_names as $field_name){
+                     $printed = ucwords(str_replace('_', ' ', $field_name)); ?>
+                    <li>
+                    <?= $printed ?>
+                   <button type=submit name=delete value=<?=$field_name?> class=button button-secondary button-small style=margin-left:10px> Delete </button>
+                   </li>
+                   <?    
+                }
+               ?>
+             </ul>
+         </form>
+     </div>
     <?php
 }
-
+ 
