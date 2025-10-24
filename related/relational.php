@@ -1,7 +1,7 @@
 <?php
 
 $status = get_option('locations_areas_status');
-if ($status === 'both') {   
+if ($status === 'both') {  
     initialize_act_lct_ml_features();
 };
 function initialize_act_lct_ml_features() {
@@ -13,57 +13,19 @@ function initialize_act_lct_ml_features() {
     register_term_meta($locations_connector_taxonomy, 'associated_act_terms', ['type' => 'array', 'single' => false, 'show_in_rest' => ['schema' => ['type' => 'array', 'items' => ['type' => 'integer']]]]);
     register_term_meta($area_connector_tax, 'area_parent_location_name', ['type' => 'string', 'single' => true, 'show_in_rest' => true, ]);
     register_term_meta($locations_connector_taxonomy, 'associated_act_slugs', ['type' => 'array', 'single' => false, 'show_in_rest' => ['schema' => ['type' => 'array', 'items' => ['type' => 'string']]]]);
-    
-    add_action("{$locations_connector_taxonomy}_add_form_fields", function($locations_connector_taxonomy) {
-        render_area_connection_checkboxes_for_location_terms(null, $locations_connector_taxonomy);
-    }, 10, 1);
-    add_action("{$locations_connector_taxonomy}_edit_form_fields",'render_area_connection_checkboxes_for_location_terms', 10, 2);
-    
-    add_action("{$area_connector_tax}_add_form_fields", function($area_connector_tax) {
-     render_locations_connection_radio_for_area_terms(null, $area_connector_tax);
-    }, 10, 1);
-    add_action("{$area_connector_tax}_edit_form_fields", 'render_locations_connection_radio_for_area_terms', 10, 2);
-
-    add_action("created_{$area_connector_tax}", 'save_location_connection_for_area_terms', 10, 2);
-    add_action("edited_{$area_connector_tax}", 'save_location_connection_for_area_terms', 10, 2);
+    register_term_meta($area_connector_tax, 'area_parent_location_slug', ['type' => 'string', 'single' => true, 'show_in_rest' => true, ]);
+    $location_terms_options_array = get_terms(['taxonomy' => $locations_connector_taxonomy, 'hide_empty' => false, 'fields' => 'id=>name']);
+    $service_area_options_array = get_terms(['taxonomy' => $area_connector_tax, 'hide_empty' => false, 'fields' => 'id=>name']);
+  
+    add_action("created_{$area_connector_tax}", 'save_location_connection_for_area_terms', 10, 1);
+    add_action("edited_{$area_connector_tax}", 'save_location_connection_for_area_terms', 10, 1);
     add_action("created_{$locations_connector_taxonomy}", 'save_area_connections_for_location_terms', 10, 2);
     add_action("edited_{$locations_connector_taxonomy}", 'save_area_connections_for_location_terms', 10, 2);
     add_action("delete_{$locations_connector_taxonomy}", 'delete_location_area_term_handler', 10, 2);
     add_action("delete_{$area_connector_tax}", 'delete_service_area_location_term_handler', 10, 2);
-  
-$location_term_id_key = 'area_parent_location_term';
-$location_term_name_key = 'area_parent_location_name'; 
-$column_key = 'area_parent_location_name';
-add_filter("manage_edit-{$area_connector_tax}_columns", function ($columns) use ($column_key) {
-    $columns[$column_key] = 'Parent Location';
-    return $columns;
-});
-add_action("manage_{$area_connector_tax}_custom_column", function ($content, $column_name, $term_id) use ($column_key, $location_term_id_key) { 
-    if ($column_name === $column_key) {
-        $parent_name = get_term_meta($term_id, $column_key, true);
-        $display = '<span class="area_parent_location_name">' . esc_html($parent_name) . '</span>';
-        $parent_id = get_term_meta($term_id, $location_term_id_key, true);
-        $hidden = sprintf( '<input type="hidden" class="quick-edit-%s" data-term-id="%d" value="%s" />', esc_attr($location_term_id_key), $term_id, esc_attr($parent_id) );
-        return $display . $hidden;
-    }
-    return $content;
-}, 10, 3);
-add_filter("manage_edit-{$area_connector_tax}_sortable_columns", function ($sortable_columns) {
-    $sortable_columns['area_parent_location_name'] = 'area_parent_location_name';
-    return $sortable_columns;
-});
-
-add_action('quick_edit_custom_box', function($column_name, $screen_name, $taxonomy_name)
-    use ($area_connector_tax, $column_key) {
-
-    if ($taxonomy_name === $area_connector_tax && $column_name === $column_key) {
-        render_locations_connection_radio_for_area_terms(null, $area_connector_tax, 'quick_edit');
-    }
-}, 10, 3);
-
 }
 
-function render_locations_connection_radio_for_area_terms($act_term, $area_connector_tax, $context = '') {
+function render_locations_connection_radio_for_area_terms($act_term, $area_connector_tax) {
     $current_act_term_id = '';
     if ($act_term) {
         $current_act_term_id =  $act_term->term_id;
@@ -78,13 +40,8 @@ function render_locations_connection_radio_for_area_terms($act_term, $area_conne
         }
     }
     $options_array = get_terms(['taxonomy' => $locations_connector_taxonomy, 'hide_empty' => false, 'fields' => 'id=>name']);
-    $fieldset_html = formHelper::generateRadioFieldsetWithIntegerValues( 'area_parent_location_term', 'Location Connector Parent', $current_selected_lct_term, $options_array, []);
-
-    if ($context === 'quick_edit') {
-      echo '<div class="inline-edit-col">';
-        echo $fieldset_html;
-      echo '</div>';
-    } else {
+    $fieldset_html = formHelper::generateRadioFieldsetWithIntegerValues('area_parent_location_term', 'Location Connector Parent', $current_selected_lct_term, $options_array, []);
+ {
         ?>
         <table class="striped widefat fixed">
             <td class="area-parent-term-connector">
@@ -95,61 +52,66 @@ function render_locations_connection_radio_for_area_terms($act_term, $area_conne
     }
 }
 
-function save_location_connection_for_area_terms($area_term_id, $tt_id) {
+function save_location_connection_for_area_terms($area_term_id) {
     $new_lct_id = $_POST['area_parent_location_term'] ?? '';
-    $act_int=(int)$area_term_id;
-    $act_slug = get_term($act_int)->slug;
+    $act_slug = get_term($area_term_id)->slug;
     $assignments = get_option('act_to_lct_assignments', []);
-    $assigned_slugs = get_option('act_to_lct_slug_assignments', []);
     if (isset($assignments[$area_term_id])) {
-        $current_associated_lct_database_term = $assignments[$area_term_id];
-        $current_associated_lct_term_slug = $assigned_slugs[$act_slug];
+        $current_area_parent_term_id = $assignments[$area_term_id];
+        $current_area_parent_term_id = (int)$current_area_parent_term_id;
     } else {
-        $current_associated_lct_database_term = '';
-        update_act_assignments($area_term_id, '');
-        
+        $current_area_parent_term_id = '';
     }
     if ($new_lct_id === '0' || $new_lct_id === 0 || empty($new_lct_id)) {
         update_term_meta($area_term_id, 'area_parent_location_term', '');
         update_term_meta($area_term_id, 'area_parent_location_name', '');
         update_term_meta($area_term_id, 'area_parent_location_slug', '');
-        if ($current_associated_lct_database_term!=='') {
-            $old_associated_act_terms = get_term_meta($current_associated_lct_database_term, 'associated_act_terms', true) ?: [];
-            $old_associated_act_term_slugs = get_term_meta($current_associated_lct_database_term, 'associated_act_slugs', true) ?: [];
+        if ($current_area_parent_term_id!=='') {
+            $old_associated_act_terms = get_term_meta($current_area_parent_term_id, 'associated_act_terms', true) ?: [];
+            $old_associated_act_term_slugs = get_term_meta($current_area_parent_term_id, 'associated_act_slugs', true) ?: [];
             if (($key = array_search($area_term_id, $old_associated_act_terms)) !== false) {
                 unset($old_associated_act_terms[$key]);
-                update_term_meta($current_associated_lct_database_term, 'associated_act_terms', $old_associated_act_terms);
+                update_term_meta($current_area_parent_term_id, 'associated_act_terms', $old_associated_act_terms);
             }
-            $act_id_int = (int)$area_term_id;
-            $act_term_slug = get_term($act_id_int)->slug;
-            
-            if (($slug_key = array_search($act_term_slug, $old_associated_act_term_slugs)) !== false) {
+            if (($slug_key = array_search($act_slug, $old_associated_act_term_slugs)) !== false) {
                 unset($old_associated_act_term_slugs[$slug_key]);
-                update_term_meta($associated_lct_id, 'associated_act_slugs', $old_associated_act_term_slugs);
+                update_term_meta($current_area_parent_term_id, 'associated_act_slugs', $old_associated_act_term_slugs);
             }
         }
     } else {
-        $new_lct_id = absint($new_lct_id); 
+        $new_lct_id = (int)$new_lct_id; 
         $new_lct_slug = get_term($new_lct_id)->slug;
         $new_lct_name = get_term($new_lct_id)->name; 
         update_term_meta($area_term_id, 'area_parent_location_term', $new_lct_id);
         update_term_meta($area_term_id, 'area_parent_location_name', $new_lct_name);
         update_term_meta($area_term_id, 'area_parent_location_slug', $new_lct_slug);
-        if ($current_associated_lct_database_term !== $new_lct_id) {
+        if ($current_area_parent_term_id !== $new_lct_id) {
+            if ($current_area_parent_term_id!=='') {
+                $old_associated_act_terms = get_term_meta($current_area_parent_term_id, 'associated_act_terms', true) ?: [];
+                $old_associated_act_term_slugs = get_term_meta($current_area_parent_term_id, 'associated_act_slugs', true) ?: [];
+                 if (($key = array_search($area_term_id, $old_associated_act_terms)) !== false) {
+                    unset($old_associated_act_terms[$key]);
+                    update_term_meta($current_area_parent_term_id, 'associated_act_terms', $old_associated_act_terms);
+                }
+                if (($slug_key = array_search($act_slug, $old_associated_act_term_slugs)) !== false) {
+                    unset($old_associated_act_term_slugs[$slug_key]);
+                    update_term_meta($current_area_parent_term_id, 'associated_act_slugs', $old_associated_act_term_slugs);
+                }
+            }
             $new_associated_act_terms = get_term_meta($new_lct_id, 'associated_act_terms', true) ?: [];
             $new_associated_act_slugs = get_term_meta($new_lct_id, 'associated_act_slugs', true) ?: [];
+          
             if (!in_array($area_term_id, $new_associated_act_terms)) {
                 $new_associated_act_terms[] = $area_term_id;
                  $new_associated_act_slugs[] = $act_slug;
                 update_term_meta($new_lct_id, 'associated_act_terms', $new_associated_act_terms);
-                
             }
-            
         }
     }
 
     update_act_assignments($area_term_id, $new_lct_id);
 }
+
 
 function render_area_connection_checkboxes_for_location_terms($location_term, $locations_connector_taxonomy) { 
     $area_connector_tax = get_option('enabled_connector_contexts')['service_areas']['taxonomy'];
@@ -162,12 +124,13 @@ function render_area_connection_checkboxes_for_location_terms($location_term, $l
         $assigned_act_id = (int)$assigned_act_id;
         $assigned_act_ids[] = $assigned_act_id;
         }
-    $unassigned_act_ids = [];
+      $unassigned_act_ids = [];
     foreach ($all_act_terms as $act_term_id => $act_term_name) {
-        $area_term_id = (int)$act_term_id;
-        if (in_array($area_term_id, $assigned_act_ids)) {continue;}
-            $unassigned_act_ids[$area_term_id] = $act_term_name;
+        $area_parent_location_term = get_term_meta($act_term_id, 'area_parent_location_term', true); // Get the meta value
+        if (empty($area_parent_location_term)) {
+            $unassigned_act_ids[$act_term_id] = $act_term_name;
         }
+    }
    $selected_terms = [];
     if ($location_term) {
         $current_location_connector_term_id = (int)$location_term->term_id;
@@ -180,7 +143,6 @@ function render_area_connection_checkboxes_for_location_terms($location_term, $l
     }
     $terms_to_display = $selected_terms + $unassigned_act_ids;
     ksort($terms_to_display);
-
     if (empty($terms_to_display)) {
         echo '<p>No service areas are available to be assigned.</p>';
         return;
@@ -193,17 +155,15 @@ function render_area_connection_checkboxes_for_location_terms($location_term, $l
             'checked' => array_key_exists($act_id, $selected_terms)
         ];
     }
-
     $table = [
-        'title'   => 'Associated Service Areas',
         'headers' => [$taxonomy_human_readable],
         'styles'  => ['width:100%'],
         'rows'    => [
             [
                 'cells' => [
                     [
-                        'type'    => 'checkbox_list',
-                        'name'    => 'associated_act_terms[]',
+                        'type' => 'checkbox_list',
+                        'name' => 'associated_act_terms[]',
                         'options' => $checkbox_options
                     ]
                 ]
@@ -214,20 +174,23 @@ function render_area_connection_checkboxes_for_location_terms($location_term, $l
 
     render_dibraco_admin_table($table);
 }
-function save_area_connections_for_location_terms($term_id, $tt_id) {
-    $term = get_term($term_id);
-    $taxonomy = $term->taxonomy;
-   $posted_act_terms = array_map('absint', $_POST['associated_act_terms'] ?? []);
+function save_area_connections_for_location_terms($location_term_id, $tt_id) {
+    $location_term = get_term($location_term_id);
+    $posted_act_terms = array_map('absint', $_POST['associated_act_terms'] ?? []);
     $posted_act_terms = array_filter($posted_act_terms, function($val) {
       return is_numeric($val) && $val > 0;
     });    
-    $new_lct_slug = $term->slug;
-    $new_lct_name = $term->name;
-    $lct_term_id = $term->term_id;
-    update_term_meta($term_id, 'associated_act_terms', $posted_act_terms);
+    $new_lct_slug = $location_term->slug;
+    $new_lct_name = $location_term->name;
+    $current_act_terms = get_term_meta($location_term_id, 'associated_act_terms', true);
+    update_term_meta($location_term_id, 'associated_act_terms', $posted_act_terms);
     $assignments = get_option('act_to_lct_assignments', []);
         foreach ($assignments as $act_id => $lct_id) {
-            if ($lct_id === $term_id && !in_array($act_id, $posted_act_terms)) {
+            $act_id = (int)$act_id; 
+            if(!empty($lct_id)){
+                $lct_id = (int)$lct_id;
+            }
+            if ($lct_id === $location_term_id && !in_array($act_id, $posted_act_terms)) {
                 update_act_assignments($act_id, ''); 
                 update_term_meta($act_id, 'area_parent_location_term', ''); 
                 update_term_meta($act_id, 'area_parent_location_name', ''); 
@@ -241,24 +204,24 @@ function save_area_connections_for_location_terms($term_id, $tt_id) {
             $act_int = (int)$act_id;
             $act_slug = get_term($act_int)->slug;
             $act_slugs[] = $act_slug;
-            update_act_assignments($act_id, $term_id); 
-            update_term_meta($act_id, 'area_parent_location_term', $lct_term_id);
+            update_act_assignments($act_id, $location_term_id); 
+            update_term_meta($act_id, 'area_parent_location_term', $location_term_id);
             update_term_meta($act_id, 'area_parent_location_name', $new_lct_name); 
             update_term_meta($act_id, 'area_parent_location_slug', $new_lct_slug); 
         }   
-        update_term_meta($lct_term_id, 'associated_act_slugs', $act_slugs);
+        update_term_meta($location_term_id, 'associated_act_slugs', $act_slugs);
     }
 
 
 function update_act_assignments($act_id, $lct_id = null) {
    $act_int = (int)$act_id;
    $act_slug = get_term($act_int)->slug;
-    $assignments = get_option('act_to_lct_assignments');
-     $assigned_slugs = get_option('act_to_lct_slug_assignments');
+   $assignments = get_option('act_to_lct_assignments');
+   $assigned_slugs = get_option('act_to_lct_slug_assignments');
     if ($lct_id === null || $lct_id === '' || $lct_id === 0) {
         $assignments[$act_id] = '';
         $assigned_slugs[$act_slug]='';
-    } elseif($act_id ==='') {
+    } else {
         $assignments[$act_id] = (int)$lct_id;
         $assigned_slugs[$act_slug] = get_term($lct_id)->slug;
     }
