@@ -1,0 +1,76 @@
+#relationships-settings {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+}
+#relationships-settings #contexts .group-fields.hidden {
+    display: none!important;
+}
+
+#relationships-settings h4{
+width:100%;
+margin:.5em;
+display:flex;
+flex-direction:column;
+}
+#relationships-settings .toggles-sidebar {
+    width: 15%;
+    display: flex;
+    flex-direction: column;
+}
+
+
+#relationships-settings select, #relationships-settings label{
+    display:flex;
+    flex-direction:column;
+    width:100%;
+}
+#relationships-settings #contexts {
+   display:flex;
+    width: 80%;
+    flex-direction:column;
+}
+
+#relationships-settings #contexts .section-fields {
+    width: 100%; 
+     display: flex;
+       flex-direction: column;
+}
+#relationships-settings #contexts .section-fields .dibraco-section {
+    display: flex;
+    width:100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+#relationships-settings #contexts .group-fields {
+    display:flex;
+    flex-wrap:wrap;
+    max-width:30%;
+    align-content: flex-start;
+    padding: 10px;
+    margin-left: 10px;
+    border: 1px solid black;
+}
+#relationships-settings #contexts fieldset{
+    width:40%;
+}
+
+#contexts .the-toggle {
+  width: 40px;
+  height: 20px;
+  border-radius: 20px;
+}
+
+#contexts .the-toggle .toggle-label {
+  font-size: 0.7em;
+  border-radius: 20px;
+}
+
+#contexts.toggle-input.toggle-no:checked ~ .toggle-label.toggle-no {
+  transform: translateX(40px);
+}
+
+#contexts .toggle-input.toggle-yes:checked ~ .toggle-label.toggle-yes {
+  transform: translateX(-40px);
+}

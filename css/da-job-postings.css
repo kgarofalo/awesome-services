@@ -1,172 +1,137 @@
-.job-meta-box {
-    margin: 2px 0;
-    display: flex;
-    flex-wrap:wrap;
-    gap:2px;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+#job-details-form {
+display: flex;
+  flex-direction: column;  
+}
+#job-details-form .section-fields {
+flex-wrap:wrap;
+display:flex;
+  align-items: flex-start;
+
+}
+#job-details-form .section-fields h4{
+    margin:5px;
     width:100%;
-}
-.job-meta-box h4 {
-    margin: .1em;
-    display:block;
-    width:100%;
-}
-.job-meta-box .dibraco-section .section-fields{
-    display:flex;
-    flex-wrap:wrap;
-    width:100%;
-    background: #fff;
-    border: 1px solid black;
-    border-radius: 2px;
-    margin:2px;
-    gap:5px;
-    box-sizing:border-box;
-    padding:2px;
-}
-.job-meta-box .dibraco-group{
-    padding:2px;
-}
-.job-meta-box .dibraco-section {
-width:100%;
-background-color:#ffc35657;
-}
-.job-meta-box .group-fields {
-    gap:5px;
-}
-.job-meta-box .the-toggle {
-    justify-self: center;      
-    align-items: center; 
-}
-.job-meta-box .dibraco-textarea label{
     display:flex;
     flex-direction:column;
-}
-.job-meta-box .dibraco-textarea {
-width:60%;
-}
-.job-meta-box textarea{
-    width:100%;
-}
-.job-meta-box #education-requirements .section-fields{
-    display: flex;  
-    justify-content: space-evenly;
-    align-items: center;       
-    width: 100%;               
-    flex-wrap: wrap;          
-}
-#education_setup,
-#education_experience_fields{
-    width:100%;
+    font-size:1.2em;
 }
 
-#education_experience_fields .group-fields{
+#education_setup .group-fields{
     display:flex;
-    flex-wrap:wrap;
-}
-#education-requirements .section-fields .dibraco-toggle{
- width:22%;
-justify-items:center;
-}
-#education-requirements .dibraco-group .group-fields{
     flex-direction:row;
 }
-#education-requirements .dibraco-number,
-#education-requirements .dibraco-select{
-    align-self:start;
-    width:30%;
+#experience .group-fields{
+    display:flex;
+    flex-direction:row;
+}
+#job-details-form .section-fields .dibraco-section{
+ display: flex;
+  flex-direction: column; 
+  width:48%;
+}
+
+#job-details-form .dibraco-date {
+    max-width: 48%;
+}
+#job-details-form .dibraco-checkbox {
+    max-width:10%;
+}
+
+#job-details-form .dibraco-section .dibraco-toggle{
+flex-direction:column;
+align-items:center;
+display:flex!important;
+align-self:flex-start;
+display:flex;
+width:40%;
+max-width:100px;
+}
+#job-details-form label + select {
+    display:flex;
+    flex-direction:column;
+    flex-wrap:wrap;-
+}
+#job-details-form #job-details input[type=text]{
+    min-height:2.5em;
+}
+#job-details-form #job-details input[type=date]{
+width:90%;
+text-transform:uppercase;
+ min-height:2.5em;
+}
+#job-details-form #job-details .dibraco-date,
+#job-details-form .dibraco-number{
+ max-width:49%;   
+}
+
+#job-details-form .dibraco-checkbox {
+    display:inline-block;
+    padding-left:5px;
+    padding-right:5px;
+}
+
+
+
+
+#job-details-form #address .address-street-address,
+#job-details-form #address .address-street-address-2{
+    width:48%;
     
 }
-.job-meta-box #education-requirements .section-fields .hidden {
-    display:none!important;
+#job-details-form #address .job-location_type,
+#job-details-form #address .adresses{
+    width:48%;
 }
-.job-meta-box .dibraco-wysiwyg.experience-description .hidden, .job-meta-box .dibraco-wysiwyg.qualifications .hidden {
-    display:none!important
-}
-
-.job-meta-box .dibraco-wysiwyg.experience-description,
-.job-meta-box .dibraco-wysiwyg.qualifications{
-    width:75%;
-    display:flex;
-    flex-direction:column;
-    align-self:start;
+#job-details-form #address .address-city,
+#job-details-form #address .address-state,
+#job-details-form #address .address-zipcode,
+#job-details-form #address .address-addy-country,
+#job-details-form #address .address-latitude,
+#job-details-form #address .address-longitude{
+  width:30%;
 }
 
 
-#job-details .section-fields {
-    justify-content:space-between;
-}
-#salary > h4{
-    display:none;
-}
-.job-meta-box #compensation .group-fields {
-    flex-direction:row;
+#job-details-form .the-toggle {
+  width: 50px;
+  height: 25px;
+  border-radius: 20px;
 }
 
 
-#address {
-    width: 60%;
-}
-#address .group-fields {
-    display: flex;
-    gap: 5px;
-    flex-direction:row;
-    width: 100%;
-    flex-wrap: wrap;
-}
-.job-meta-box #benefits_section .section-fields {
-  display: flex;
-  flex-direction: column;
-  width: 100%;             
-}
-#benefits {
-    display:flex;
-    flex-wrap:wrap;
+
+#job-details-form .toggle-input.toggle-no:checked ~ .toggle-label.toggle-no {
+  transform: translateX(40px);
 }
 
-.job-meta-box #benefits_section .section-fields .dibraco-group .group-fields {
-  display: inline-flex;
-  flex-wrap: wrap;
-  width: 100%;
-}
-#responsibilities-skills .dibraco-textarea{
-width:100%;
-}
-
-.job-meta-box #benefits_section,
-.job-meta-box #responsibilities-skills {
-    display: flex;
-    flex-direction: column; 
-    width: 49.5%;           
-    box-sizing: border-box;
+#job-details-form .toggle-input.toggle-yes:checked ~ .toggle-label.toggle-yes {
+  transform: translateX(-40px);
 }
 
 @media (max-width: 768px) {
-    .job-meta-box {
-        flex-direction: column; 
+    #job-details-form #benefits_section,
+    #job-details-form #responsibilities-skills {
+        width: 100%;
+        margin-bottom: 5px;
     }
 
-    div#benefits_section, div#responsibilities-skills {
-        width: 100%;   
-        margin-bottom: 5px;  
-    }
-
-    /* Stack content inside .section-fields vertically for mobile */
-    .job-meta-box div#benefits_section.dibraco-section .section-fields,
-    .job-meta-box div#responsibilities-skills.dibraco-section .section-fields {
+    #job-details-form div#benefits_section.dibraco-section .section-fields,
+    #job-details-form div#responsibilities-skills.dibraco-section .section-fields {
         flex-direction: column;
     }
 
-    /* Ensure all columns inside #responsibilities-skills take full width */
-    .job-meta-box #responsibilities-skills .section-fields > .dibraco-textarea,
-    .job-meta-box #responsibilities-skills .section-fields > #skills {
-        width: 100%; 
-        margin-bottom: 2px;  
+    #job-details-form #responsibilities-skills .section-fields > .dibraco-textarea,
+    #job-details-form #responsibilities-skills .section-fields > #skills {
+        width: 100%;
+        margin-bottom: 2px;
     }
-     .job-meta-field {
-    flex: 1 1 calc(100% - 10px); /* Single column on tablets */
-  }
+}
+
+
+.repeater-rows {
+    display: flex;
+    flex-wrap:wrap;
+    gap:10px
 }
 
 

@@ -1,3 +1,42 @@
+.quickedit-fieldset legend {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #222;
+  grid-column: 1 / -1;
+}
+
+/* make radios flow into columns */
+.quickedit-fieldset {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 1px;
+  border: none;
+  margin: 0;
+  padding: 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.quickedit-fieldset label {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1.2em;
+  transition: background .15s;
+  word-break:break-word;
+}
+
+.quickedit-fieldset label:hover {
+  background: #eef4ff;
+}
+
+.quickedit-fieldset input[type="radio"] {
+  margin-right: 4px;
+}
+
 #edittag {
   max-width: 1000px;
 }
@@ -10,21 +49,72 @@
 .visible {
   visibility: visible;
 }
-#relationships-settings #contexts .dibraco-group.hidden {
-    display: none !important;
-}
-
-
 
 .hidden {
   visibility: hidden;
 }
-
-
+.dibraco-wysiwyg {
+    display:flex;
+    flex-direction:column;
+}
+.dibraco-wysiwyg label {
+    display:flex;
+}
+.mce-i-phone::before {
+    font-family: 'dashicons' !important;
+    content: '\f525';
+}
+   .mce-i-piglet::before {
+            font-family: 'dashicons' !important;
+            content: '\f231'; 
+        }
+.no-edits-sa{
+ display:flex;
+ flex-direction:row;
+ flex-wrap:wrap;
+ width:95%;
+padding: 10px;
+gap: 10px;
+background-color: #6299ff42;
+}
+.no-edits-sa .dibraco-no-edit p{
+ font-size:1.2em;
+}
+#pairs_template .section-fields {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  width:100%;
+}
+#pairs_template .dibraco-pair .dibraco-text {
+width:100%;
+}
+#pairs_template .dibraco-pair {
+  display:flex;
+  flex-direction:column;
+  width:47%;
+}
 #da_list_repeater .repeater-row{
 	width:100%;
 	display:block;
 }
+
+#main_service_form .dibraco-split {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem; 
+}
+
+#dibraco_landscape_images, #dibraco_portrait_images {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem; 
+}
+
+#main_service_form .split-group {
+    display:block;
+}
+
 /* -----------------------------------------
    2. Benefit Form & List
 ------------------------------------------ */
@@ -60,55 +150,60 @@
 #employee-fields .section-fields .dibraco-textarea {
   width: 50%;
 }
-#certification_section {
+#certification_data {
 	display:flex;
 	flex-direction:row;
 	margin-top:10px;
 }
-#certification_section.hidden {
+#certification_data.hidden {
 	display:none!important;
 }
-#certification_section .group-fields {
-    display: flex;
-    flex-wrap: wrap;
-	flex-direction:row;
-    gap: 8px;
+#certification_data .split-group > label {
+    display:inline-flex;
+    flex-direction:column;
+    width:23%;
+}
+#certification_data .dibraco-textarea, #certification_data .dibraco-image-field{
+width: 40%;
+display: inline-flex;
+flex-direction: column;
 }
 
-#certification_section .group-fields .dibraco-text {
-    width: 22%;
-}
-
-#certification_section .group-fields .dibraco-textarea {
-    width: 34%;
-}
-
-#certification_section .group-fields .dibraco-image-field {
-    width: 30%;
-    height: 200px; 
-    display: flex;
+#service_area_section_fields {
+display: flex;
     flex-direction: column;
-    align-items: center;
+    flex-wrap: wrap;
+    background-color: #6299ff42;
+    padding: 10px;
+    border-radius: 4px;
+    width: 95%;
 }
-
-#certification_section .group-fields .image-preview-container {
+#service_area_section_fields h3 {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     width: 100%;
-    height: 150px;
-    margin-bottom: 10px;
-    text-align: center;
+    
 }
 
-#certification_section .group-fields .image-preview {
-    width: 100%;
-    height: 100%; 
-    object-fit: contain;
-    display: none;
+#service_area_section_fields .section-fields {
+    display: flex;
+    flex-direction:row;
+    flex-wrap:wrap;
+  align-items: center; 
+        gap: 10px; 
 }
-
-#certification_section .group-fields .image-preview.visible {
-    display: block; 
+#service_area_section_fields #dibraco_landscape_images {
+    flex-direction: column;
+    display: flex
 }
-
+#service_area_section_fields #dibraco_landscape_images > div  {
+    flex-direction: row;
+    display: flex
+}
+#service_area_section_fields .group-fields .dibraco-text{
+    width:18%;
+}
 /* -----------------------------------------
    3. Dibraco Section & Fields (Preserved Cascade)
 ------------------------------------------ */
@@ -120,250 +215,241 @@
   border-radius: 8px;
 }
 
-.dibraco-section h3 {
-  display: flex;
-  font-size: 1em;
-  font-weight: bold;
-  color: #333;
-  text-transform: uppercase;
-  margin: 1px 0;
-  padding-bottom: 0;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.dibraco-section .section-fields {
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-}
-
-.section-fields .dibraco-section {
-  display: flex;
-  flex-direction: column;
-}
-
 /* -----------------------------------------
-   4. Dibraco Group Structure
+ 4. Dibraco Group Structure
 ------------------------------------------ */
 .dibraco-group h4 {
-  font-size: 0.9em;
-  font-weight: bold;
-  color: #555;
-  margin-bottom: 10px;
-  display: flex;
-  flex-wrap: wrap;
-  width: 100%;
+ font-size: 0.9em;
+ font-weight: bold;
+ color: #555;
+ margin-bottom: 10px;
+ display: flex;
+ flex-wrap: wrap;
+ width: 100%;
 }
 
-.dibraco-group .group-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-/* Field Labels */
-.dibraco-section label,
-.dibraco-group label,
+.dibraco-section h3,
+.dibraco-group h3,
 .dibraco-repeater label {
-  display: block;
-  font-size: 0.9em;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 2px;
+ display: block;
+ font-size: 0.9em;
+ font-weight: bold;
+ color: #333;
+ margin-bottom: 2px;
 }
 
-/* Inputs & Textareas */
-.dibraco-section input[type="text"],
-.dibraco-group input[type="text"],
-.dibraco-repeater input[type="text"],
-.dibraco-section input[type="number"],
-.dibraco-group input[type="number"],
-.dibraco-repeater input[type="number"],
-.dibraco-section textarea,
-.dibraco-group textarea,
-.dibraco-repeater textarea {
-  padding: 3px;
-  font-size: 0.9em;
-  border: 1px solid black;
-  border-radius: 4px;
-  background-color: #fff;
-  width: 100%;
-  box-sizing: border-box;
+.dibraco-text,
+.dibraco-textarea,
+.dibraco-time,
+.dibraco-date,
+.dibraco-select,
+.dibraco-number,
+.dibraco-no-edit {
+  flex-direction:column;
+  display:flex;
 }
 
-/* Time Inputs (hide pickers) */
+.dibraco-no-edit p {
+ padding: 3px;
+ font-size: 0.9em;
+ border: 1px dashed #999;
+ border-radius: 4px;
+ background-color: #fff;
+ color: #333;
+ width: 100%;
+ box-sizing: border-box;
+ margin: 0;
+ min-height: 1.5em;
+}
+
+/* CONSOLIDATED: All standard text-entry inputs share these styles */
+.dibraco-text input[type="text"],
+.dibraco-number input[type="number"],
+.dibraco-textarea textarea,
+.dibraco-date input[type="date"],
+.dibraco-select select
+{
+ padding: 3px;
+ font-size: 0.9em;
+ border: 1px solid black;
+ border-radius: 4px;
+ background-color: #fff;
+ width: 100%;
+box-sizing: border-box;
+min-height: 1.5em;
+}
+
+input.button.button-small.wp-picker-default{
+    display:none!important;
+}
 .dibraco-time input[type="time"]::-webkit-calendar-picker-indicator,
 .dibraco-time input[type="time"]::-moz-calendar-picker-indicator,
 .dibraco-time input[type="time"]::-ms-clear {
-  display: none;
+ display: none;
+}
+.dibraco-color-picker {
+    margin-bottom: 15px;
 }
 
-/* Color Picker */
 .dibraco-color-picker label {
-  display: block;
-  font-size: 0.8em;
+    display: flex;
+    font-weight: bold;
+    flex-direction:column;
+    flex-wrap:wrap;
+    margin-bottom: 5px;
 }
-.dibraco-color-picker .dibraco-hex8-input {
-  display: block;
-  font-size: 0.9em;
-  max-width: 80px;
-  height: 25px;
-  padding-left: 2px;
+
+.dibraco-color-picker .dibraco-color-input {
+    display: none;
+}
+
+.dibraco-color-picker .wp-color-result {
+    display: inline-flex !important;
+    align-items: center;
+    padding: 0 !important;
+    width: 130px;
+    height: 30px;
+    line-height: 28px;
+    border: 1px solid #8c8f94;
+    border-radius: 3px;
+    background: #f6f7f7;
+    cursor: pointer;
+    overflow: hidden;
 }
 
 .dibraco-color-picker .wp-color-result-text {
-  line-height: 2;
-  max-height: 25px;
+    flex-grow: 1;
+    text-align: center;
+    padding: 0 10px;
+    color: #2271b1;
+    background-color: #f6f7f7;
 }
 
-.dibraco-color-picker .wp-picker-active .dibraco-hex8-input {
-  display: inline-block;
-  position: absolute;
+.dibraco-color-picker .wp-color-result .color-alpha {
+    width: 30px;
+    height: 100%;
+    display: inline-block;
+    border-right: 1px solid #ccc;
 }
 
 .dibraco-color-picker .wp-picker-holder {
-  margin-bottom: 5px;
-}
-.dibraco-color-picker .wp-picker-default{
-    display:none;
-}
-.dibraco-color-picker .wp-picker-container .wp-color-result.button {
-  min-height: 20px;
-  max-height: 25px;
+    position: absolute;
+    z-index: 100;
 }
 
-.dibraco-color-picker .dibraco-slider .ui-slider-handle {
-  margin-bottom: -10px !important;
-  background-color: rgba(0,0,0,0.9) !important;
+.dibraco-color-picker .iris-picker {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
-.dibraco-color-picker .iris-picker.iris-border {
-  width: 272px !important;
-  box-shadow: -4px 7px 7px -3px;
-  z-index:5;
+.dibraco-color-picker .iris-picker-inner {
+    display: flex;
 }
 
-.dibraco-color-picker .iris-picker .iris-square {
-  margin-right: 0 !important;
+.dibraco-color-picker .dibraco-alpha-slider {
+    width: 25px !important;
+    margin-left: 10px;
+    border: 1px solid #aaa;
+    position: relative; /* Needed for positioning the gradient overlay */
+    background-image:
+        linear-gradient(45deg, #ccc 25%, transparent 25%),
+        linear-gradient(135deg, #ccc 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #ccc 75%),
+        linear-gradient(135deg, transparent 75%, #ccc 75%);
+    background-size: 10px 10px;
+    background-position: 0 0, 5px 0, 5px -5px, 0px 5px;
 }
 
-.dibraco-color-picker .iris-slider,
-.iris-strip {
-  width: 24px !important;
-  margin-left:5px;
+.dibraco-color-picker .dibraco-alpha-slider .alpha-gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
 }
 
-.dibraco-color-picker .iris-picker .iris-square-value {
-  width: 0 !important;
-  height: 0 !important;
+.dibraco-color-picker .dibraco-alpha-slider .ui-slider-handle {
+    border: 1px solid #aaa;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    width: 100%;
+    height: 8px; /* <-- ADDED: Gives the handle a visible height */
+    margin-left: 0;
+    margin-top: -4px; /* <-- ADDED: Centers the handle vertically */
+    left: -1px;
+    z-index: 2; /* Ensure handle is on top of the gradient */
+    cursor: pointer;
 }
-
 /* -----------------------------------------
    3. Buttons
 ------------------------------------------ */
+/* CONSOLIDATED: Base style for all standard blue action buttons */
 .benefits-list button,
-.repeater-wrapper .add-row-button,
-.repeater-wrapper .remove-row-button {
-  background-color: #0073aa;
-  color: #fff;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.85em;
-  transition: background-color 0.2s;
+.dibraco-repeater-wrapper .add-row-button,
+.dibraco-dibraco-repeater-wrapper .add-row-button {
+ background-color: #0073aa;
+ color: #fff;
+ border: none;
+ padding: 8px 12px;
+ border-radius: 4px;
+ cursor: pointer;
+ font-size: 0.85em;
+ transition: background-color 0.2s;
 }
 
 .benefits-list button:hover,
-.repeater-wrapper .add-row-button:hover {
-  background-color: #005177;
+.dibraco-repeater-wrapper .add-row-button:hover {
+ background-color: #005177;
 }
 
-.repeater-wrapper .remove-row-button {
-  background-color: #d63638;
-  margin-top: 10px;
+.dibraco-repeater-wrapper .remove-row-button {
+background-color: #d63638;
+ margin-top: 10px;
 }
 
-.repeater-wrapper .remove-row-button:hover {
-  background-color: #a82a2a;
-}
-
-/* Clear Image Button */
-.dibraco_clear_image_button {
-  background-color: #f8f8f8;
-  color: #a00;
-}
-
-.dibraco_clear_image_button:hover {
-  background-color: #f2f2f2;
-  color: #900;
+.dibraco-repeater-wrapper .remove-row-button:hover {
+ background-color: #a82a2a;
 }
 
 /* -----------------------------------------
    4. Radio Button Styling
 ------------------------------------------ */
-/* Quickedit Radio Buttons */
-.custom-quickedit-block .dibraco-radio label {
-  display: inline-block;
-  margin-right: 14px;
-  font-size: 13px;
-  white-space: nowrap;
-}
 
-.custom-quickedit-block .dibraco-radio fieldset {
-  margin-bottom: 14px;
-  border: 1px solid black;
-  padding: 2px;
-}
-
-.custom-quickedit-block .dibraco-radio fieldset p {
+.dibraco-radio-fieldset.area-parent-location-term  {
   font-weight: bold;
+  display:block;
+  margin-bottom: 5px;
 }
 .dibraco-radio-fieldset.area-parent-location-term {
-  margin-bottom: 14px;
+  display: grid; 
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  width:100%;
+  gap: 5px; 
+  margin-top: 5px;
   padding: 10px;
   border: 1px solid #ccc; 
 }
 
-.dibraco-radio-fieldset.area-parent-location-term p {
-  font-weight: bold;
-  display:block;
-  width:100%;
-  margin-bottom: 5px;
-}
-.dibraco-radio-fieldset.area-parent-location-term #area_parent_location_term {
-  display: grid; 
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  width:100%;
-  gap: 10px; 
-  margin-top: 10px;
-}
 
-
-.dibraco-radio-fieldset.area-parent-location-term {
-  display: flex;
-  flex-wrap: wrap; 
-  gap: 10px;       
-}
-
-#postbox-container-1 .postbox .dibraco-radio-fieldset fieldset {
+#dibraco_render_side_meta_box fieldset {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 3px;
   width: 100%;
+  max-width:300px;
 }
 
-#postbox-container-1 .postbox .dibraco-radio-fieldset label {
-  display: flex;
-  align-items: center;
-}
-
-#postbox-container-1 .postbox .dibraco-radio-fieldset input[type="radio"] {
+#dibraco_render_side_meta_box input[type="radio"] {
   vertical-align: middle;
 }
 
-#postbox-container-1 .postbox p {
+#dibraco_render_side_meta_box legend {
   margin: 0 0 10px 0;
+   display: flex;
+  align-items: center;
   font-size: 14px;
   color: #000;
 }
@@ -389,20 +475,17 @@
   box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
 }
 
-.toggle-legend {
+.dibraco-toggle fieldset legend {
   font-size: 12px;
   font-weight: 600;
-  margin: 3px 0;
+  margin-bottom:5px;
   display: flex;
-}
-
-.the-toggle .toggle-input {
-  position: absolute;
-  opacity: 0;
-  user-select: none;
+  flex-direction:column;
 }
 
 .the-toggle .toggle-label {
+      opacity: 0;
+  user-select: none;
   position: absolute;
   top: 0;
   left: 0;
@@ -445,85 +528,6 @@
   transform: translateX(-60px);
   z-index: 1;
 }
-#relationships-settings {
-    display: flex;
-    flex-wrap: wrap;
-    width: 100%;
-}
-
-
-#relationships-settings #toggles_section h3{
-    width:100%;
-}
-#relationships-settings .toggles-sidebar {
-    width: 15%;
-    display: flex;
-    flex-direction: column;
-}
-
-#relationships-settings #toggles_section > .section-fields {
-    display: flex;
-    flex-direction: column;
-}
-#relationships-settings #contexts h3,
-#relationships-settings #contexts h4 {
-    width: 100%;
-}
-#relationships-settings #contexts {
-   display:flex;
-    width: 80%;
-    flex-direction:column;
-}
-
-#relationships-settings #contexts .section-fields {
-    width: 100%; 
-     display: flex;
-       flex-direction: column;
-}
-#relationships-settings #contexts .section-fields .dibraco-section {
-    display: flex;
-    width:100%;
-    flex-direction: row;
-    flex-wrap: wrap;
-}
-#relationships-settings  #contexts .dibraco-group {
-    display:flex;
-    flex-wrap:wrap;
-    align-content: flex-start;
-    max-width:250px;
-}
-
-#relationships-settings #contexts .dibraco-group .group-fields {
-    display: flex;
-    flex-direction: row;
-     flex-wrap: wrap;  
-}
-#relationships-settings #contexts .dibraco-group .group-fields .dibraco-select,
-#relationships-settings #contexts .dibraco-group .group-fields .dibraco-select select {
-width: 100%;
-}
-
-#relationships-settings #contexts .dibraco-group .group-fields .dibraco-toggle {
-    width:48%;
-}
-#contexts .the-toggle {
-  width: 40px;
-  height: 20px;
-  border-radius: 20px;
-}
-
-#contexts .the-toggle .toggle-label {
-  font-size: 0.7em;
-  border-radius: 20px;
-}
-
-#contexts.toggle-input.toggle-no:checked ~ .toggle-label.toggle-no {
-  transform: translateX(40px);
-}
-
-#contexts .toggle-input.toggle-yes:checked ~ .toggle-label.toggle-yes {
-  transform: translateX(-40px);
-}
 
 .repeater-rows {
     display: flex;
@@ -531,29 +535,20 @@ width: 100%;
     gap:20px
 }
 
-.repeater-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    max-width: 100%;
-}
 
-.repeater-row > *:not(.remove-button):not(button) {
-    max-width: 100%;
-}
 .repeater-row .remove-button {
     width: 100%;
     order: 1; 
 }
 
-.repeater-wrapper .add-button {
+.dibraco-repeater-wrapper .add-button {
     display: flex;
     justify-content: flex-start; 
     margin-top: 10px;
 }
 
-.repeater-wrapper .add-row-button,
-.repeater-wrapper .remove-row-button {
+.add-row-button,
+.remove-button .remove-row-button {
     background-color: #0073aa;
     color: #fff;
     border: none;
@@ -565,196 +560,93 @@ width: 100%;
     width:100px;
 }
 
-.repeater-wrapper .add-row-button:hover,
-.repeater-wrapper .remove-row-button:hover {
+.add-row-button:hover,
+.repeater-row .remove-button .remove-row-button:hover {
     background-color: #005177;
 }
 
-.repeater-wrapper .remove-row-button {
+.remove-button .remove-row-button {
     background-color: #d63638;
     margin-top: 10px; 
 }
 
-/* Hover effect for remove button */
-.repeater-wrapper .remove-row-button:hover {
+.remove-button  .remove-row-button:hover {
     background-color: #a82a2a;
 }
 
 
-/* -----------------------------------------
-   7. Image Field Styling
------------------------------------------- */
+
 .dibraco-image-field {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-sizing: border-box;
+    margin-bottom: 1em;
+    min-width: 150px; 
+    max-width: 320px; /* Keep this for wider contexts */
 }
-.dibraco-image-field p{  
-line-height: 1.5;
-    margin-top: 1px;
-    font-weight: 500;
-    margin-bottom: 0px;
-}
-.dibraco-image-field .image-preview-container {
-  background-color: #f8f8f8;
-  border: 1px solid #ccc;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-  min-height:100px;
-  background-color:white;
-  width: 100%;
-  max-width: 300px;
-  max-height:100%;
-}
-
-.dibraco-image-field .image-preview-container img.image-preview {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: scale-down;
-  display: block;
-}
-
-/* Context-specific image layouts */
-#edittag .dibraco-admin-table .dibraco-before-after-container .repeater-rows {
-  display: flex;
-  flex-direction: row;
-  gap: 6px; 
-  flex-wrap: wrap;
-  width: 100%; 
-}
-
-#edittag .dibraco-admin-table .dibraco-before-after-container .repeater-row {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  width:295px;
-  gap:5px;
-}
-
-#edittag .dibraco-admin-table .dibraco-before-after-container .repeater-row .dibraco-image-field {
-  max-width: 48%;
-}
-#edittag .dibraco-admin-table .dibraco-before-after-container .repeater-row .remove-button {
-  width: 100%; 
-  order: 1; 
-  margin-top: 10px;
-}
-#edittag .dibraco-admin-table .dibraco-portrait-images-container .dibraco-image-field,
-#edittag .dibraco-admin-table .dibraco-landscape-images-container .dibraco-image-field {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  width: calc(20% - 1%);
-}
-
-#edittag .dibraco-admin-table .dibraco-portrait-images-container .image-preview-container {
-  aspect-ratio: 3 / 4;
-}
-
-#edittag .dibraco-admin-table .dibraco-landscape-images-container .image-preview-container {
-  aspect-ratio: 16 / 9;
-}
-
-.postbox .dibraco-image-field {
-  width: 100%;
-}
-
-.postbox .dibraco-image-field .image-preview-container {
-  max-width: 300px;
-}
-#da_type_portrait_images .image-preview-container,
-#da_type_portrait_images.postbox .dibraco-image-field-portrait .image-preview-container {
-  aspect-ratio: 3 / 4;
-}
-#da_type_landscape_images .image-preview-container,
-#da_type_landscape_images.postbox .dibraco-image-field-landscape .image-preview-container {
-  aspect-ratio: 16 / 9;
-}
-
-#da_type_before_after_images.postbox .dibraco-image-field .image-preview-container {
-  aspect-ratio: 1 / 1;
-}
-
 .dibraco-image-field .buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-top: 5px;
+    display: flex;
+    flex-wrap: wrap; 
+    justify-content: center;
+    gap: 6px;
+    margin-top: 6px;
 }
 
-.postbox .dibraco-image-field .buttons {
-  flex-direction: row;
+/* Individual buttons */
+.dibraco-image-field .buttons .button {
+    min-width: 100px;
+    width: 100%;
+    max-width:300px;
+    flex-basis: calc(50% - 3px);
+    text-align: center;
+}
+/* Base label/title */
+.dibraco-image-field p {
+font-size: 14px;
+    font-weight: 500;
+    margin: 0 0 4px 0;
+    line-height: 1.4;
+    text-align: center;
 }
 
-
-.dibraco-admin-table {
-  width: 100%;
-  border-collapse: collapse;  
+.dibraco-image-field .image-preview-container {
+    border: 1px solid #ddd;
+    background: #fafafa;
+    overflow: hidden;
+    width: 100%; /* Fit container */
+    box-sizing: border-box;
+}
+.dibraco-image-field .image-preview-container img.image-preview {
+    width: 100%; /* Changed */
+    height: auto; /* Changed */
+    max-width: 100%;
+    object-fit: contain;
+    display: block;
 }
 
-/* Table Body */
-.dibraco-admin-table tbody {
-  width: 100%;  
-}
-
-.dibraco-admin-table tr {
-  display: table-row; 
-}
-
-/* Table Cells */
-.dibraco-admin-table td {
-  display: flex; 
-  flex-wrap: wrap; 
-  padding: 10px;  
-  vertical-align: top;
-}
-.dibraco-text,
-.dibraco-textarea{
-    flex-direction:column;
-    display:flex;
-}
 
 /* -----------------------------------------
    9. Miscellaneous
 ------------------------------------------ */
-.add-context-section .the-toggle,
-.add-context-section .toggle-legend {
-  justify-self: flex-end;
-}
-/* === Responsive: ≤1200px === */
-@media (max-width: 1200px) {
-  #edittag .dibraco-admin-table td .dibraco-image-field {
-    width: calc(33.33% - 15px);
-    max-width: calc(33.33% - 15px);
-  }
-}
-
-/* === Responsive: ≤768px === */
-@media (max-width: 768px) {
-  #edittag .dibraco-admin-table td .dibraco-image-field {
-    width: calc(50% - 15px);
-    max-width: calc(50% - 15px);
-    min-width: 150px;
-  }
-
-  .repeater-wrapper {
-    grid-template-columns: 1fr;
-  }
-
-  .repeater-wrapper .add-row-button,
-  .repeater-wrapper .remove-row-button {
-    width: 100%; /* Make buttons full width */
-  }
-}
-
-/* === Responsive: ≤480px === */
-@media (max-width: 480px) {
-  #edittag .dibraco-admin-table td .dibraco-image-field {
-    width: 100%;
-    max-width: 100%;
-    margin-left: 0;
-    margin-right: 0;
-  }
-}
+#edittag .dibraco-admin-table .dibraco-before-after-container .repeater-rows{display:flex;flex-direction:row;gap:6px;flex-wrap:wrap;width:100%;}
+#edittag .dibraco-admin-table .dibraco-before-after-container .repeater-row{display:flex;flex-direction:row;flex-wrap:wrap;width:295px;gap:5px;}
+#edittag .dibraco-admin-table .dibraco-before-after-container .repeater-row .dibraco-image-field{max-width:48%;}
+#edittag .dibraco-admin-table .dibraco-before-after-container .repeater-row .remove-button{width:100%;max-width:600px;order:1;margin-top:10px;}
+#edittag .dibraco-admin-table .dibraco-portrait-images-container .dibraco-image-field,#edittag .dibraco-admin-table .dibraco-landscape-images-container .dibraco-image-field{display:flex;flex-direction:column;justify-content:space-between;width:calc(20% - 1%);}
+#edittag .dibraco-admin-table .dibraco-portrait-images-container .image-preview-container{aspect-ratio:3/4;}
+#edittag .dibraco-admin-table .dibraco-landscape-images-container .image-preview-container{aspect-ratio:16/9;}
+#dibraco_post_side_meta_box .dibraco-image-field{width:100%;max-width:100%;}
+#dibraco_post_side_meta_box .dibraco-image-field .image-preview{height:auto;}
+#dibraco_post_side_meta_box .dibraco-image-field .image-preview-container{max-width:100%;}
+.dibraco_clear_image_button{background-color:#f8f8f8;color:#a00;}
+.dibraco_clear_image_button:hover{background-color:#f2f2f2;color:#900;}
+.dibraco-admin-table{width:100%;border-collapse:collapse;}
+.dibraco-admin-table tbody{width:100%;}
+.dibraco-admin-table tr{display:table-row;}
+.dibraco-admin-table td{display:flex;flex-wrap:wrap;padding:10px;vertical-align:top;}
+@media (max-width:1200px){#edittag .dibraco-admin-table td .dibraco-image-field{width:calc(33.33% - 15px);max-width:calc(33.33% - 15px);}}
+@media (max-width:768px){#edittag .dibraco-admin-table td .dibraco-image-field{width:calc(50% - 15px);max-width:calc(50% - 15px);min-width:150px;}
+.dibraco-repeater-wrapper{grid-template-columns:1fr;}
+.dibraco-repeater-wrapper .add-row-button,.dibraco-repeater-wrapper .remove-row-button{width:100%;}}
+@media (max-width:480px){#edittag .dibraco-admin-table td .dibraco-image-field{width:100%;max-width:100%;margin-left:0;margin-right:0;}}
