@@ -4,9 +4,6 @@ if (!shortcode_exists('current_year')) {
         return date('Y'); 
     });
 }
-function getSchemaOptions() {
-    return initialize_schema_options();
-}
 function initialize_schema_options() {
     return [
         'Service' => 'Service', 'Person' => 'Person',
@@ -104,179 +101,228 @@ $social_media_nested_array =[];
     return $current_company_values; 
 }
 
-function initialize_dafields($prefix ='') {
-   $select_options = get_company_schema_types();
-   $contact_info = get_contact_info_fields($prefix);
-   $social_media = get_social_media_fields();
-   $address = get_address_fields();
-   $hours_of_operation = get_hours_of_operation_fields();
-return ['contact_info' => ['type' => 'visual_section', 'fields' => $contact_info], 'address' => ['type' => 'visual_section', 'fields' => $address], 'social_media' => ['type' => 'visual_section', 'fields' => $social_media], 'hours_of_operation' => ['type' => 'visual_section', 'fields' => $hours_of_operation]];
-}
-function company_info_options_page() { 
-$options_config_by_section = initialize_dafields();
-$current_company_values = get_option('company_info', []);
-$values_for_helper = [];
-$social_media_keys = get_option('custom_social_media_keys');
-$hours_of_operation_field_keys = get_hours_array_keys();
-if (isset($current_company_values['facebook'])) {
-    $current_company_values = migrate_social_media_fields($current_company_values, $social_media_keys);
-}
-foreach ($current_company_values as $field_key => $value) {
-   if ($field_key ==='social_media'){
-      foreach ($value as $field_key => $value){
-        $values_for_helper[$field_key] = $value;
-      }
-       continue;
-   }
-  if ($field_key ==='hours_of_operation') { 
-      foreach ($hours_of_operation_field_keys as $field_key){
-        $values_for_helper[$field_key] = $value[$field_key];
-      }
-       continue;
-   }
-    $values_for_helper[$field_key]= $value;
-}
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['company_info_nonce'])) {
-        handle_save_company_info();
+function initialize_dafields($request_from_where = '') {
+    $schema_options = get_company_schema_types();
+    $cert_fields = [];
+    if($request_from_where ===''){
+       $status = get_option('locations_areas_status')??'none';
+        $show_address_on_org = "1";
+        if ($status === 'multi_locations' || $status === 'both' || $status==='multi_locations') {
+        $show_address_on_org = get_option('company_info')['show_address_on_org'] ??"1";
+          }
+       $value247 = '';
+        if ($show_address_on_org ==='1'){
+            $value247 = get_option('company_info')['hours_of_operation']['open_247']??'0';
+        }
+        if($show_address_on_org ==='0'){
+           $schema_options = ['Organization' => 'Organization', 'NGO'=> 'NGO', 'Corporation' => 'Corporation', 'MedicalOrganization' => 'Medical Organization'];
+        }
+       $business_data = get_company_info_only_fields($schema_options);
     }
+    if ($request_from_where ==='location_'){
+        $locations_context = get_option('enabled_connector_contexts')['locations'];
+        $po_id = (int)get_the_ID();
+        $location_id ='';
+        if ($po_id !==0 && $po_id !=='0' && (!empty($po_id))){
+            $locations_taxonomy = $locations_context['taxonomy'];
+            $location_id = dibraco_get_current_term_id_for_post($po_id,  $locations_taxonomy);
+        }
+        if ($location_id ===''){
+            $location_id=(int) $_GET['tag_ID'];
+        }
+        if (!empty($location_id)){
+            $value247 = get_term_meta($location_id, 'hours_of_operation', true)['open_247'];
+        }
+         if($locations_context['has_certification']==="1"){
+           $cert_fields = get_certification_fields();
+        }
+        $business_data = get_location_only_fields($schema_options); 
+    }
+    
+    $image_fields = get_location_or_company_image_fields($request_from_where);
+    $contact_info = get_contact_info_fields($request_from_where);
+    $social_media = get_social_media_fields();
+    $address = get_address_fields();
+    $hours_of_operation = get_hours_of_operation_fields();
+    $da_fields = [
+        'image-fields' => ['type' => 'field_group', 'fields' => $image_fields],
+        'business_information'=> ['type' => 'field_group', 'fields'=> $business_data],
+        'contact_info' => ['type' => 'visual_section', 'fields' => $contact_info],
+        'social_media' => ['type' => 'visual_section', 'storage' => '1', 'fields' => $social_media],
+        'address' => ['type' => 'visual_section', 'fields' => $address],
+        'hours_of_operation' => ['type' => 'visual_split', 'storage' => '1', 'condition'=> ['field'=> 'open_247', 'values' => ['0'], 'current_value' =>$value247], 'fields' =>$hours_of_operation],
+          ] + $cert_fields + [
+    ];
+    if ($request_from_where === 'location_') {
+             $da_fields += get_repeater_field_list();
+      
+        if ($locations_context['landscape_images'] === "1") {
+            $da_fields += get_term_landscape_fields();
+         }
+        if (($locations_context['portrait_images']) === "1") {
+            $da_fields += get_term_portrait_fields();
+        }
+   } else {
+        if ($show_address_on_org ==='0'){
+           unset($da_fields['address']);
+           unset($da_fields['hours_of_operation']);
+           unset($da_fields['contact_info']['fields']['place_id']);
+           unset($da_fields['contact_info']['fields']['gmb_map_link']);
+           unset($da_fields['image-fields']['fields']['exterior_image']);
+           }
+        }
+    return $da_fields;
+}
+
+function company_info_options_page() { 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['submit_action'] === 'save_company_info_options') {
+        handle_save_company_info();
+}
+
+    $template_fields = initialize_dafields();
+    error_log(print_r($template_fields,true));
+    $storage_keys = dibraco_extract_nested_arrays_test($template_fields);
+        error_log(print_r($storage_keys,true));
+
+    $all_values = get_option('company_info', []);
+        error_log(print_r($all_values,true));
+
+    foreach($storage_keys as $container_name => $storage_array_key){
+        if (is_array($storage_array_key)){
+             if (array_key_exists($container_name, $all_values)) {
+              $all_values = array_merge($all_values, $all_values[$container_name]); 
+              $storage_keys = array_merge($storage_keys,$storage_keys[$container_name]);
+              unset($all_values[$container_name]);
+              unset($storage_keys[$container_name]);
+            }
+        }
+    }    
+    $mapped_values = array_intersect_key($all_values, $storage_keys);
+
     ?>
-        <div class="wrapper">
-        <form id="company-info-form" method="post" class="dibraco">
-            <h1>Company Info</h1>
-            <?php wp_nonce_field('update_company_info_nonce', 'company_info_nonce'); ?>
-            <?= FormHelper::generateField('doesnt_matter', ['type'=> 'starttracking', 'meta_array' => $values_for_helper]); ?>
-             <div class="location-term-form">
-                <div class="dibraco-section" id="top-section">
-                    <div id="image-fields">
-                     <?= FormHelper::generateField('company_logo', ['type' => 'image']); ?>
-					 <?= FormHelper::generateField('map_pin', ['type' => 'image']); ?>
-					 </div>
-                   <div class="individual-fields">
-                        <?= FormHelper::generateField('legal_name', ['label'=> 'Legal Name', 'type' => 'text']);?>
-                        <?= FormHelper::generateField('founding_date', ['label'=> 'Company Founding Date', 'type' => 'text',]);?>
-                        <?= FormHelper::generateField('schema', ['type' => 'select', 'options' => get_company_schema_types()]); ?>
-                        <?= FormHelper::generateField('about_page', ['type' => 'select', 'options' => get_pages_for_contact_about()]); ?>
-                        <?= FormHelper::generateField('contact_page', ['type' => 'select', 'options' => get_pages_for_contact_about()]); ?>
-                        <?= FormHelper::generateField('non_profit_status', ['label' => 'Non Profit?', 'type'  => 'toggle', 'value' => "0"]); ?>
-                        <?= FormHelper::generateField('non_profit_type', ['label'=> 'Non Profit Type', 'type' => 'select', 'options' => get_non_profit_type(), 'condition' => ['field' => 'non_profit_status', 'values' => ["1"]]]); ?>
-                        <?=FormHelper::generateField('company_description',['type'=>'textarea']);?>
-                        <?= FormHelper::generateField('generate_schema', ['label' => 'Generate Schema?', 'type'  => 'toggle', 'value' => "0"]); ?>
-                    </div></div>
-                     <?php foreach ($options_config_by_section as $section_key => $section_data){
-                                echo FormHelper::generateVisualSection($section_key, $section_data);
-                         }
-                         ?>
-              <?= FormHelper::generateField('trackerend', ['type'=> 'endtracking']); ?>
-           </div>
-            <p><button type="submit" name="submit_action" value="save_company_info_options" class="button button-primary">Save Company </button></p>
-             
+    <div class="wrap">
+    <form id="company-info-form" method="post" class="dibraco">
+        <h1>Company Info</h1>
+        <?php wp_nonce_field('update_company_info_nonce', 'company_info_nonce'); 
+        FormHelper::generateField('who_cares', ['type' => 'valueinjector', 'meta_array' => $mapped_values]);
+        echo FormHelper::generateVisualSection('location-main-form', ['fields' => $template_fields]);
+        FormHelper::generateField('who_cares', ['type' => 'injectionend']);
+        ?>
+        <p><button type="submit" name="submit_action" value="save_company_info_options" class="button button-primary">Save Company </button></p>
     </form>
-    </div>
+     </div>
     <?php
 }
-
 function handle_save_company_info() {
     if (!isset($_POST['company_info_nonce']) || !wp_verify_nonce($_POST['company_info_nonce'], 'update_company_info_nonce')) {
+        return;
     }
-    if (!current_user_can('manage_options')) {
-    }
-    $submitted_data = $_POST;
-    $options_to_save = [];
-    $social_media_data = [];
-    $hours_of_operation_data = [];
-    $social_media_keys = get_option('custom_social_media_keys', []);
-    $hours_of_operation_field_keys = get_hours_array_keys();
-    $day_map = get_dibraco_day_map();
-    $tracking_flag = false;
-     foreach ($submitted_data as $fieldname => $value) {
-        if ($fieldname === 'tracking_started') {
-            $tracking_flag = true;
-            continue;
-        }
 
-        if (!$tracking_flag) {
-            continue;
-        }
+    $all_fields = initialize_dafields();
+    $storage_keys = dibraco_extract_nested_arrays_test($all_fields);
+    $data_to_save = [];
 
-        if ($fieldname === 'tracking_finished') {
-            break;
-        }
-
-        if (in_array($fieldname, $hours_of_operation_field_keys)) {
-            $hours_of_operation_data[$fieldname] = $value;
-        } elseif (in_array($fieldname, $social_media_keys)) {
-            $social_media_data[$fieldname] = $value;
-        } else {
-            $options_to_save[$fieldname] = $value;
-        }
-    }
-    if ($hours_of_operation_data['open_247'] === '1') {
-        foreach ($day_map as $full_day_name => $abbr) {
-            $hours_of_operation_data["{$abbr}_open_hour"] = '';
-            $hours_of_operation_data["{$abbr}_close_hour"] = '';
-            $hours_of_operation_data["open_{$full_day_name}"] = '1';
-        }
-    } else {
-        foreach ($day_map as $full_day => $abbr) {
-            $is_open_key = "open_{$full_day}";
-            if ($hours_of_operation_data[$is_open_key] !== '1') {
-                $hours_of_operation_data["{$abbr}_open_hour"] = '';
-                $hours_of_operation_data["{$abbr}_close_hour"] = '';
+   foreach ($storage_keys as $container_name => $field_name) {
+          if (!is_array($field_name)){
+               $data_to_save[$field_name] = $_POST[$field_name];
+          }
+          if (is_array($field_name)){
+             foreach ($field_name as $field_name => $field_value){
+                $data_to_save[$container_name][$field_name] = $_POST[$field_value];
+             }
+               if ($container_name === 'hours_of_operation') {
+            $day_map = get_dibraco_day_map();
+            if ($data_to_save['hours_of_operation']['open_247'] === '1') {
+                foreach ($day_map as $full => $abbr) {
+                    $data_to_save['hours_of_operation'][$abbr.'_open_hour'] = '';
+                    $data_to_save['hours_of_operation'][$abbr.'_close_hour'] = '';
+                    $data_to_save['hours_of_operation']['open_'.$full] = '1';
+                }
+            } else {
+                foreach ($day_map as $full => $abbr) {
+                    if ($data_to_save['hours_of_operation']['open_'.$full] !== '1') {
+                        $data_to_save['hours_of_operation'][$abbr.'_open_hour'] = '';
+                        $data_to_save['hours_of_operation'][$abbr.'_close_hour'] = '';
+                    }
+                }
             }
         }
     }
-    if ($options_to_save['place_id']!==''){
-        $place_id = $options_to_save['place_id'];
-        $options_to_save['gmb_map_link']  = 'https://www.google.com/maps/place/?q=place_id:' . urlencode($place_id);
+}
+   $show_address_on_org ="1";
+    $status = get_option('company_info')['locations_areas_status'];
+    if ($status === 'multi_locations' || $status === 'both') {
+        $show_address_on_org = get_option('company_info')['show_address_on_org'] ??"1";
     }
-    $options_to_save['social_media'] = $social_media_data;
-    $options_to_save['hours_of_operation'] = $hours_of_operation_data;
-    $normal_url = '';
-    $street_url = '';
-    $normal_url ='';
-    if (!empty($options_to_save['city']) && !empty($options_to_save['state'])) {
-        $geo = get_lat_long_from_osm_2(
-            $options_to_save['street_address'],
-            $options_to_save['city'],
-            $options_to_save['state'],
-            $options_to_save['zipcode']
-        );
-    $street_address = $options_to_save['street_address'];
-    if (!empty( $options_to_save['street_address_2'])){
-        $street_address = "{$options_to_save['street_address']} {$options_to_save['street_address_2']}";
-    }
-    $address_query = implode(', ', array_filter([
-        $options_to_save['name'],
-        $street_address,
-        $options_to_save['city'],
-        $options_to_save['state'],
-        $options_to_save['zipcode']
-    ]));
-    $base_url = 'https://maps.google.com/maps?q=' . urlencode($address_query);
-    $normal_url   = $base_url . '&z=14';
-    $coords_query = '';
-    if ($geo) {
-            $options_to_save['latitude'] = $geo['lat'];
-            $options_to_save['longitude'] = $geo['long'];
+           if ($show_address_on_org ==='1'){
+               if ($data_to_save['place_id'] !== '') {
+                    $place_id = $data_to_save['place_id'];
+                    $data_to_save['gmb_map_link'] = 'https://www.google.com/maps/place/?q=place_id:' . urlencode($place_id);
+                }
+
+            $normal_url = '';
+            $street_url = '';
+
+            if (!empty($data_to_save['city']) && !empty($data_to_save['state'])) {
+                $geo = get_lat_long_from_osm_2(
+                $data_to_save['street_address'],
+                $data_to_save['city'],
+                $data_to_save['state'],
+                $data_to_save['zipcode']
+                );
+
+                $street_address = $data_to_save['street_address'];
+              if (!empty($data_to_save['street_address_2'])) {
+                 $street_address = "{$data_to_save['street_address']} {$data_to_save['street_address_2']}";
+              }
+
+        $address_query = implode(', ', array_filter([
+            $data_to_save['name'],
+            $street_address,
+            $data_to_save['city'],
+            $data_to_save['state'],
+            $data_to_save['zipcode'],
+        ]));
+
+        $base_url   = 'https://maps.google.com/maps?q=' . urlencode($address_query);
+        $normal_url = $base_url . '&z=14';
+        $coords_query = '';
+
+        if ($geo) {
+            $data_to_save['latitude']  = $geo['lat'];
+            $data_to_save['longitude'] = $geo['long'];
+
+            if (isset($geo['boundingbox'])) {
+                $polygon_json = json_encode($geo['boundingbox']);
+                $data_to_save['bounding_box'] = $polygon_json;
+            }
+
             $coords_query = $geo['lat'] . ',' . $geo['long'];
         }
-    if ($coords_query !== '') {
-        $streetview_params = ['q'=>$address_query,'cbll'=>$coords_query,'cbp'=>'12,235,,0,5','layer'=>'c','output'=>'svembed'];
-        $street_url = 'https://maps.google.com/maps?q=' . http_build_query($streetview_params);
-    }
-    }
-    $options_to_save['normal_map'] = $normal_url;
-    $options_to_save['street_map'] = $street_url;
-    update_option('company_info', $options_to_save);
+
+        if ($coords_query !== '') {
+            $streetview_params = [
+                'q'      => $address_query,
+                'cbll'   => $coords_query,
+                'cbp'    => '12,235,,0,5',
+                'layer'  => 'c',
+                'output' => 'svembed',
+            ];
+            $street_url = 'https://maps.google.com/maps?' . http_build_query($streetview_params);
+            }
+        }
+            $data_to_save['normal_map'] = $normal_url;
+            $data_to_save['street_map'] = $street_url;
+        }
+    update_option('company_info', $data_to_save);
+
     $redirect_url = admin_url('admin.php?page=dibraco-relationships-company-info&status=updated');
     wp_safe_redirect($redirect_url);
     exit;
 }
 
 
-
-
-function get_lat_long_from_osm_2($street = '', $city = '', $state = '', $postal_code = '') {
+function get_lat_long_from_osm_2($street = '', $city = '', $state = '', $postal_code = '', $country ='') {
     $params = [];
     if (empty($city) || empty($state)) {
         error_log('OSM Geocoding: Function failed because city or state was empty.');
@@ -286,9 +332,14 @@ function get_lat_long_from_osm_2($street = '', $city = '', $state = '', $postal_
     if (!empty($city)) $params['city'] = urlencode($city);
     if (!empty($state)) $params['state'] = urlencode($state);
     if (!empty($postal_code)) $params['postalcode'] = urlencode($postal_code);
-    $params['country'] = 'US';
+    if (!empty($country)) $params['country'] = urlencode($country);
+    if (empty($country)) $params['country'] = 'US';
+    
     $query_string = http_build_query($params);
-    $url = "https://nominatim.openstreetmap.org/search?{$query_string}&format=json";
+    
+    // Always ask for the polygon data, regardless of whether it's a location or service area.
+    $url = "https://nominatim.openstreetmap.org/search?{$query_string}&format=jsonv2";
+
     $args = [
         'headers' => [
             'User-Agent' => 'WordPress/' . home_url(),
@@ -297,7 +348,6 @@ function get_lat_long_from_osm_2($street = '', $city = '', $state = '', $postal_
     $response = wp_remote_get($url, $args);
     
     if (is_wp_error($response)) {
-        // Log for this failure condition
         error_log('OSM Geocoding WP_Error: ' . $response->get_error_message());
         return null;
     }
@@ -307,15 +357,22 @@ function get_lat_long_from_osm_2($street = '', $city = '', $state = '', $postal_
     if (!empty($response_body)) {
         $data = json_decode($response_body);
         if (!empty($data) && !empty($data[0])) {
-            return ['lat' => $data[0]->lat, 'long' => $data[0]->lon];
+                $result = [
+                'lat'  => $data[0]->lat,
+                'long' => $data[0]->lon,
+                'boundingbox' => $data[0]->boundingbox
+            ];
+            if (isset($data[0]->geojson) && isset($data[0]->geojson->coordinates)) {
+                // If it does, add the polygon data to our result.
+                $result['polygon'] = $data[0]->geojson->coordinates;
+            }
+
+            return $result;
         }
     }
-
-    // Log for the final failure condition
     error_log('OSM Geocoding Error: Failed to get valid coordinates from response. Response Body: ' . $response_body);
     return null;
 }
-
 function company_info_address_shortcode() {
     $company_info = get_option('company_info');
     $street_address = $company_info['street_address'];
@@ -395,7 +452,7 @@ function company_info_logo_url_shortcode() {
 
 
 function register_company_info_shortcodes() {
-    $company_info = get_option('company_info');
+    $company_info = get_option('company_info',[]);
 
     add_shortcode('company_info_address', 'company_info_address_shortcode');
     add_shortcode('company_info_phone', 'company_info_phone_number_shortcode');
@@ -413,26 +470,7 @@ function register_company_info_shortcodes() {
             });
         }
     }
-
-
- if (!empty($company_info['social_media'])) {
-        foreach ($company_info['social_media'] as $platform => $url) {
-            if (!empty($url)) {
-                $shortcode_tag = "company_info_{$platform}";
-                add_shortcode($shortcode_tag, function() use ($url) {
-                    return esc_url($url);
-                });
-            }
-        }
-    }
-	$hours_of_operation = $company_info['hours_of_operation']; 
-    foreach ($hours_of_operation as $key => $value) {
-        add_shortcode("company_info_hours_of_operation_{$key}", function() use ($key, $company_info) {
-            return $company_info['hours_of_operation'][$key]; 
-        });
-    }
 }
-
 add_action('after_setup_theme', 'register_company_info_shortcodes');   
 
 
