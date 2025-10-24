@@ -1,90 +1,188 @@
 <?php
-
+if ( ! is_admin() && ! wp_doing_ajax() && ! wp_doing_cron() ) {
 add_action('init', 'setup_schema_injection_hook');
 function setup_schema_injection_hook() {
-if (!is_admin()) {
 $generate_schema = get_option('company_info')['generate_schema'] ?? '';
 if ($generate_schema !=="1"){return;}
+        DibracoSchemaEnv::init();
         add_action('wp_head', 'inject_dynamic_schema');
     }
 }
 
+class DibracoSchemaEnv {
+    // --- Properties ---
+    public static $status;
+    public static $company_info;
+    public static $company_schema_type;
+    public static $show_address_on_org ="1";
+    public static $locations_context = [];
+    public static $service_areas_context = [];
+    public static $act_to_lct_assignments = [];
+    public static $act_to_lct_slug_assignments = [];
+    public static $home_url;
+    public static $company_entity_id;
+    public static $website_id;
+    public static $logo_node;
+    public static $website_node;
+    public static $about_page_url;
+    public static $contact_page_url;
+    public static $organization_stub_node;
+    public static $marker_icon_url;
+    public static function init() {
+        self::$company_info = get_option('company_info');
+        self::$company_schema_type = self::$company_info['schema'];
+        self::$status = get_option('locations_areas_status');
+        
+        if (!self::$status) return;
+        $map_pin_id = get_option('company_info')['map_pin'];
+        self::$marker_icon_url = wp_get_attachment_url($map_pin_id);  
+        $connector_contexts = get_option('enabled_connector_contexts');
+        if (in_array(self::$status, ['multi_locations', 'both'], true)) {
+            if (!in_array(self::$company_schema_type, ['Corporation', 'NGO', 'MedicalOrganization'], true)) {
+                self::$company_schema_type = 'Organization';
+            }
+            self::$locations_context = $connector_contexts['locations'];
+            self::$show_address_on_org = self::$company_info['show_address_on_org'];
+            if (self::$status === 'both') {
+                self::$service_areas_context = $connector_contexts['service_areas'];
+                self::$act_to_lct_assignments = get_option('act_to_lct_assignments');
+                self::$act_to_lct_slug_assignments = get_option('act_to_lct_slug_assignments');
+            }
+        }
+        
+        self::$home_url = trailingslashit(home_url());
+        self::$company_entity_id = self::$home_url . '#' . strtolower(self::$company_schema_type);
+        self::$website_id = self::$home_url . '#website';
+         self::$about_page_url = '';
+        $about_page_id = self::$company_info['about_page'];
+        if (!empty($about_page_id)) {
+            self::$about_page_url = trailingslashit(get_permalink((int)$about_page_id));
+        }
+
+        self::$contact_page_url = '';
+        $contact_page_id = self::$company_info['contact_page'];
+        if (!empty($contact_page_id)) {
+            self::$contact_page_url = trailingslashit(get_permalink((int)$contact_page_id));
+        }
+        self::$logo_node = self::build_logo_node();
+        self::$website_node = self::build_website_node();
+        self::$organization_stub_node = self::build_organization_stub_node();
+    }
+public static function build_logo_node() {
+        $logo_url = self::$company_info['company_logo'];
+        if (empty($logo_id)) {return;}
+        $logo_id = attachment_url_to_postid($logo_url);
+        $logo_data = wp_get_attachment_metadata($logo_id);
+        return [
+            '@type'   => 'ImageObject',
+            '@id'     => self::$home_url . '#logo',
+            'url'     => $logo_url,
+            'width'   => $logo_data['width'],
+            'height'  => $logo_data['height'],
+            'caption' => self::$company_info['name']
+        ];
+    }
+ public static function build_organization_stub_node() {
+        $entity = [
+            '@type' => self::$company_schema_type,
+            '@id'   => self::$company_entity_id,
+            'name'  => self::$company_info['name'],
+            'url'   => self::$home_url,
+        ];
+
+        if (self::$show_address_on_org === '1') {
+            $entity['telephone'] = format_phone_number_e164(self::$company_info['phone_number']);
+        } else {
+            $entity['contactPoint'] = [
+                '@type' => 'ContactPoint',
+                'telephone' => format_phone_number_e164(self::$company_info['phone_number']),
+                'contactType' => 'customer service',
+                'url' => self::$contact_page_url
+            ];
+        }
+
+        if (!empty(self::$logo_node)) {
+            $entity['logo'] = [
+                '@id' => self::$logo_node['@id']
+            ];
+        }
+        
+        return $entity;
+    }
+
+ public static function build_website_node() {
+        $publisher = [ '@type' => self::$company_schema_type,
+            '@id' => self::$company_entity_id];
+
+        return [
+            '@type' => 'WebSite',
+            '@id' => self::$website_id,
+            'url' => self::$home_url,
+            'name' => get_bloginfo('name'),
+            'description' => get_bloginfo('description'),
+            'publisher' => $publisher,
+            'inLanguage'  => get_bloginfo('language'),
+            'potentialAction' => [
+                '@type' => 'SearchAction',
+                'target' => [
+                    '@type' => 'EntryPoint',
+                    'urlTemplate' => self::$home_url . '?s={search_term_string}', ],
+                'query-input' => 'required name=search_term_string', ],
+        ];
+    }
+}
 
 function inject_dynamic_schema() {
-
     $current_post_id = get_the_ID();
     if (!$current_post_id) { return; }
-    $page_url = get_permalink($current_post_id);
-    $home_url = home_url();
-    $status = get_option('locations_areas_status');
-    if (!$status) { return; }
-    $company_data = get_option('company_info');
-    $company_schema_type = 'Organization';
-    if ($status !== 'multi_locations' && $status !== 'both') {
-        $company_schema_type = $company_data['schema'];
-    }
-     if ($company_data['schema'] ==='Corporation'){
-        $company_schema_type = 'Corporation';
-    }
-    $about_page_url = '';
-    $about_page_id = get_option('company_info')['about_page'];
-    if (!empty($about_page_id)){
-    $about_page_url = trailingslashit(get_permalink($about_page_id));
-    }
-    $contact_page_url ='';
-    $contact_page_id = get_option('company_info')['contact_page'];
-    if (!empty($contact_page_id)){
-    $contact_page_url = trailingslashit(get_permalink($contact_page_id));
-    }
-    $main_company_id = home_url() . '#' . $company_schema_type;
-    $website_node = _build_website_node($main_company_id);
-    $breadcrumb_node = _build_breadcrumb_node($current_post_id);
-    $page_url = trailingslashit($page_url);
-    $home_url = trailingslashit($home_url);
-    
+    $page_url = trailingslashit(get_permalink($current_post_id));
+    if (!DibracoSchemaEnv::$status) { return; }
+    $breadcrumb_node = build_breadcrumb_node($current_post_id);
     $main_entity_node = [];
     $webpage_node = [];
     $company_entity_not_on_front = []; 
-
-    if ($page_url === $home_url){
-        $main_entity_node = _build_main_company_entity($company_data, $status);
-        $webpage_node = _build_webpage_node($current_post_id, $home_url, ['@id' => $main_entity_node['@id']]);
-		$main_entity_node['mainEntityOfPage'] = ['@id' => $webpage_node['@id']];
+    if ($page_url === DibracoSchemaEnv::$home_url) {
+        $main_entity_node = build_main_company_entity();
+        $webpage_node = build_webpage_node($current_post_id, $page_url, ['@id' => $main_entity_node['@id']]);
+        $main_entity_node['mainEntityOfPage'] = ['@id' => $webpage_node['@id']];
     } else {
-        $main_entity_node = generate_combined_schema_graph($status, $current_post_id);
-        $company_entity_not_on_front = _build_organization_stub_node($status);
+        $main_entity_node = generate_combined_schema_graph($current_post_id);
         if (!empty($main_entity_node)) {
-            $webpage_node = _build_webpage_node($current_post_id, $page_url, ['@id' => $main_entity_node['@id']]);
+            $company_entity_not_on_front = DibracoSchemaEnv::$organization_stub_node;
+            $webpage_node = build_webpage_node($current_post_id, $page_url, ['@id' => $main_entity_node['@id']]);
             $main_entity_node['mainEntityOfPage'] = ['@id' => $webpage_node['@id']];
         }
     }
+
     $nodes = [
         $main_entity_node,
-        $website_node,
+        DibracoSchemaEnv::$website_node,
         $company_entity_not_on_front,
         $webpage_node,
         $breadcrumb_node,
+        DibracoSchemaEnv::$logo_node,
     ];
+
     $nodes_to_graph = [];
-    foreach ($nodes as $node){
+    foreach ($nodes as $node) {
         $clean_node = _dibraco_filter_schema_recursive($node);
-        if (!empty($clean_node)){
-            $nodes_to_graph[]=$clean_node;
+        if (!empty($clean_node)) {
+            $nodes_to_graph[] = $clean_node;
         }
     }
 
     if (empty($nodes_to_graph)) { return; }
+
     $graph = [
         '@context' => 'https://schema.org',
         '@graph'   => $nodes_to_graph
     ];
-
-
     echo "\n" . '<script type="application/ld+json" class="dibraco-schema-graph">' . json_encode($graph, JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
 }
 
-function _build_webpage_node($post_id, $page_url, $main_entity_id_for_page) {
+function build_webpage_node($post_id, $page_url, $main_entity_id_for_page) {
     $page_name = get_the_title($post_id);
+    
     $webpage_node = [
         '@type'         => 'WebPage',
         '@id'           => $page_url . '#webpage', 
@@ -101,69 +199,7 @@ function _build_webpage_node($post_id, $page_url, $main_entity_id_for_page) {
     return $webpage_node;
 }
 
-function _build_website_node($main_entity_id) {
-    $home_url = home_url();
-    $home_url = trailingslashit($home_url);
-    $website_entity = [
-        '@type'          => 'WebSite',
-        '@id'            => $home_url . '/#website', 
-        'url'            => $home_url,
-        'name'           => get_bloginfo('name'),
-        'description'    => get_bloginfo('description'),
-        'publisher'      => [
-        '@id' => $main_entity_id,
-        ],
-        'inLanguage'     => get_bloginfo('language'),
-        'potentialAction' => [ 
-            '@type'       => 'SearchAction',
-            'target'      => [
-                '@type'       => 'EntryPoint',
-                'urlTemplate' => $home_url . '?s={search_term_string}',
-            ],
-            'query-input' => 'required name=search_term_string',
-        ],
-    ];
-
-    return $website_entity;
-}
-function _build_organization_stub_node($status) {
-    $home_url = home_url();
-    $home_url = trailingslashit($home_url);
-    $company_info = get_option('company_info');
-    $phone_number = _format_phone_number_e164($company_info['phone_number']);
-    $schema_type = $company_info['schema'];
-    if ($status === 'multi_locations' || $status === 'both') {
-        if ($schema_type!=='Corporation'){
-        	$schema_type = 'Organization';
-    	}
-	}
-    $minimal_entity = [
-        '@type' => $schema_type,
-        '@id'   => $home_url . '/#' . strtolower($schema_type),
-        'name'  => $company_info['name'],
-        'url'   => $home_url,
-        'telephone' => $phone_number,
-    ];
-    $logo_data = [];
-    $logo_attachment_id = $company_info['company_logo'];
-    $logo_url = '';
-    if ($logo_attachment_id !==''){
-        $logo_attachment_id = (int)$logo_attachment_id;
-        $logo_data = wp_get_attachment_metadata($logo_attachment_id);
-    $logo_url = wp_get_attachment_image_url($logo_attachment_id, 'full');
-    }
-    
-    $minimal_entity['logo'] = [
-        '@type'  => 'ImageObject',
-        '@id' => $logo_url . '/#logo',
-        'url'    => $logo_url,
-        'width'  => $logo_data['width'],
-        'height' => $logo_data['height'],
-    ];
-
-    return $minimal_entity;
-}
-function _build_breadcrumb_node($post_id) {
+function build_breadcrumb_node($post_id) {
     $page_url = get_permalink($post_id);
     $home_url = home_url();
     $page_url = trailingslashit($page_url);
@@ -219,55 +255,45 @@ function _dibraco_filter_schema_recursive($entity) {
     return $filtered_entity;
 }
 
-function generate_combined_schema_graph($status, $current_post_id) {
+function generate_combined_schema_graph($current_post_id) {
+    $status = DibracoSchemaEnv::$status;
     $current_post_type = get_post_type($current_post_id);
     $enabled_contexts = get_option('enabled_contexts');
     if (!$enabled_contexts) { return []; }
     foreach ($enabled_contexts as $context_name => $context_data) {
         $context_post_type = $context_data['post_type'];
-        if ($context_data['post_type'] !== $current_post_type) {
-            continue;
-        }
+        if ($context_data['post_type'] !== $current_post_type) { continue; }
         if (($context_data['context_name']) === 'locations') {
             $term_id = dibraco_get_current_term_id_for_post($current_post_id, $context_data['taxonomy']);
          if ($term_id !==''){
             $term_id =(int)$term_id;
-            $main_entity = _build_local_business_entity_from_data($current_post_id, $term_id, $context_data, $status);
+            $main_entity = build_local_business_entity_from_data($current_post_id, $term_id, $context_data, $status);
           return $main_entity;
-              }
-              continue;
-        }
-
+              } continue; }
         if (($context_data['context_name']) === 'service_areas') {
             $term_id = dibraco_get_current_term_id_for_post($current_post_id, $context_data['taxonomy']);
             if ($term_id !==''){
              $term_id =(int)$term_id;
-            return _build_service_area_entity($current_post_id, $term_id, $context_data, $status);
-            }
-           continue;
-        }
+            return build_service_area_entity($current_post_id, $term_id, $context_data, $status);
+            } continue; }
    
         if (($context_data['context_type']) === 'type') {
               if (($context_data['context_name']) === 'jobs') {
                    $main_entity = build_job_posting_schema($current_post_id, $status);
                    return $main_entity;
-                   continue;
-              }
+                   continue; }
             if (($context_data['schema']) === 'Service') {
                 $term_id = dibraco_get_current_term_id_for_post($current_post_id, $context_data['taxonomy']);
                 if ($term_id !==''){
                 $term_id =(int)$term_id;
-                $service_entity =  _build_service_entity($current_post_id, $term_id, $context_data, $status);
-                return $service_entity;
-                }
+                $service_entity =  build_service_entity($current_post_id, $term_id, $context_data, $status);
+                return $service_entity; }
             }
-           
             if (($context_data['schema'] ?? '') === 'Product') {
             }
         }
-
         if (($context_data['context_type']) === 'unique' && $context_name === 'employee') {
-            $employee_entity = _build_employee_entity($current_post_id, $status);
+            $employee_entity = build_employee_entity($current_post_id, $status);
             return $employee_entity;
         }
     }
@@ -275,32 +301,25 @@ function generate_combined_schema_graph($status, $current_post_id) {
     return [];
 }
 
-function _build_employee_entity($post_id, $status) {
+function build_employee_entity($post_id) {
+$status = DibracoSchemaEnv::$status;
+
     $page_url = get_permalink($post_id);
     $entity = [
         '@type' => 'Person',
         '@id'   => $page_url . '/#employee',
         'url'   => $page_url,
     ];
-    $given_name   = get_post_meta($post_id, 'given_name', true);
-    $family_name  = get_post_meta($post_id, 'family_name', true);
-    $work_email   = get_post_meta($post_id, 'work_email', true);
-    $work_phone   = get_post_meta($post_id, 'work_phone', true);
-    $job_title    = get_post_meta($post_id, 'job_title', true);
-    $employee_bio = get_post_meta($post_id, 'employee_bio', true);
+   $employee_data = get_post_meta($post_id, 'employee-fields', true);
 
-    $entity['givenName']   = $given_name;
-    $entity['familyName']  = $family_name;
-    $entity['email']       = $work_email;
-    $entity['telephone']   = $work_phone;
-    $entity['jobTitle']    = $job_title;
-    $entity['description'] = wp_strip_all_tags($employee_bio);
-    $full_name_parts = array_filter([$given_name, $family_name]);
-    if (!empty($full_name_parts)) {
-        $entity['name'] = implode(' ', $full_name_parts);
-    }
+     $entity['givenName']   = $employee_data['given_name'];
+    $entity['familyName']  = $employee_data['family_name'];
+    $entity['email']       = $employee_data['work_email'];
+    $entity['telephone']   = $employee_data['work_phone'];
+    $entity['jobTitle']    = $employee_data['job_title'];
+    $entity['description'] = wp_strip_all_tags($employee_data['employee_bio']);
 
-    $organization_stub = _build_organization_stub_node($status);
+    $organization_stub = DibracoSchemaEnv::build_organization_stub_node();
     $entity['worksFor'] = ['@id' => $organization_stub['@id']];
 
     if ($status === 'multi_locations' || $status === 'both') {
@@ -310,7 +329,7 @@ function _build_employee_entity($post_id, $status) {
         $location_term_id = dibraco_get_current_term_id_for_post($post_id, $locations_taxonomy);
 
         if (!empty($location_term_id)) {
-            $local_business_stub = _build_local_business_stub_from_data($location_term_id);
+            $local_business_stub = build_local_business_stub_from_data($location_term_id);
             $entity['jobLocation'] = ['@id' => $local_business_stub['@id']];
         }
     }
@@ -339,111 +358,33 @@ function _build_employee_entity($post_id, $status) {
     return $entity;
 }
 
-function _build_main_company_entity($company_data, $status) {
-    $home_url = home_url();
-    $home_url = trailingslashit($home_url);
-    $main_entity_type = $company_data['schema'];
-    if ($status === 'multi_locations' || $status === 'both') {
-        if ($main_entity_type!=='Corporation'){
-        $main_entity_type = 'Organization';
-    }}
-    $logo_data = wp_get_attachment_metadata($company_data['company_logo']);
-    $logo_url = wp_get_attachment_image_url($company_data['company_logo'], 'full');
-    $logo = [
-        '@type'  => 'ImageObject',
-        '@id' => $logo_url . '/#logo',
-        'url'    => $logo_url,
-        'width'  => $logo_data['width'],
-        'height' => $logo_data['height'],
-    ];
-    $main_entity_id = $home_url . '/#' . $main_entity_type;
-    $phone_number = _format_phone_number_e164($company_data['phone_number'])??'';
-	$image ='';
-	if ($company_data['exterior_image'] !==''){
-	$image = wp_get_attachment_image_url($company_data['exterior_image'], 'full');
-	}
-    $entity = [
-        '@type'       => $main_entity_type,
-        '@id'         => $main_entity_id,
-        'url'         => $home_url,
-        'name'        => $company_data['name'],
-        'logo'        => $logo,
+function build_main_company_entity() {
+    $company_info = DibracoSchemaEnv::$company_info;
+    $status = DibracoSchemaEnv::$status;
+    $show_address_on_org = DibracoSchemaEnv::$show_address_on_org;
+    $image = '';
+    if ($show_address_on_org === '1' && !empty($company_info['exterior_image'])) {
+        $image = wp_get_attachment_image_url($company_info['exterior_image'], 'full');
+    }
+   $telephone = format_phone_number_e164($company_info['phone_number']);
+   $entity = [
+        '@type'       => DibracoSchemaEnv::$company_schema_type,
+        '@id'         => DibracoSchemaEnv::$company_entity_id,
+        'url'         => DibracoSchemaEnv::$home_url,
+        'name'        => $company_info['name'],
         'image'       => $image,
-        'description' => strip_tags($company_data['company_description']),
-        'email'       => $company_data['email_address'],
-        'faxNumber'   => $company_data['fax_number'],
-        'legalName'   => $company_data['legal_name'],
+        'description' => strip_tags($company_info['company_description']),
+        'email'       => $company_info['email_address'],
+        'faxNumber'   => $company_info['fax_number'],
+        'legalName'   => $company_info['legal_name'],
+        'foundingDate'=> $company_info['founding_date'],
     ];
 
-   if (!empty($company_data['founding_date'])) {
-        $entity['foundingDate'] = date('Y-m-d', strtotime($company_data['founding_date']));
+    if (!empty(DibracoSchemaEnv::$logo_node)) {
+        $entity['logo'] = ['@id' => DibracoSchemaEnv::$logo_node['@id']];
     }
-   $enabled_type_contexts = get_option('enabled_type_contexts');
-    if (!empty($enabled_type_contexts)) {
-        foreach ($enabled_type_contexts as $context_data) {
-            if (($context_data['has_certification'] ?? '') !== '1') {
-                continue;
-            }
-
-            $taxonomy = $context_data['taxonomy'];
-            $terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => true]);
-
-            if (is_wp_error($terms) || empty($terms)) {
-                continue;
-            }
-
-            foreach ($terms as $term) {
-                if (get_term_meta($term->term_id, 'has_certification', true) !== '1') {
-                    continue;
-                }
-
-                $cert_data = get_term_meta($term->term_id, 'certification_data', true);
-
-                if (empty($cert_data['certification_name']) || isset($seen_cert_names[$cert_data['certification_name']])) {
-                    continue;
-                }
-                
-                $term_cert_node = [
-                    '@type' => 'Certification',
-                    '@id'   => $home_url . '#cert-' . $term->taxonomy . '-' . $term->term_id, // Creates a unique @id
-                    'name'  => $cert_data['certification_name'],
-                    'url'   => $cert_data['certification_url'] ?? null,
-                    'description' => $cert_data['certification_description'] ?? null,
-                    'certificationIdentification' => $cert_data['certification_id'] ?? null,
-                    'about' => $cert_data['certification_about'] ?? null,
-                ];
-
-                if (!empty($cert_data['certification_logo'])) {
-                    $term_cert_node['logo'] = wp_get_attachment_url((int)$cert_data['certification_logo']);
-                }
-                if (!empty($cert_data['certification_valid_from'])) {
-                    $term_cert_node['validFrom'] = date('Y-m-d', strtotime($cert_data['certification_valid_from']));
-                }
-                if (!empty($cert_data['certification_valid_in'])) {
-                    $term_cert_node['validIn'] = ['@type' => 'AdministrativeArea', 'name' => $cert_data['certification_valid_in']];
-                }
-                if (!empty($cert_data['certification_expires'])) {
-                    $term_cert_node['expires'] = date('Y-m-d', strtotime($cert_data['certification_expires']));
-                }
-                if (!empty($cert_data['certification_issuer_name'])) {
-                    $term_cert_node['issuedBy'] = [
-                        '@type' => 'Organization',
-                        'name'  => $cert_data['certification_issuer_name'],
-                        'url'   => $cert_data['certification_issuer_url'] ?? null,
-                    ];
-                }
-                
-                $all_certifications[] = $term_cert_node;
-                $seen_cert_names[$term_cert_node['name']] = true;
-            }
-        }
-    }
-
-    if (!empty($all_certifications)) {
-        $entity['hasCertification'] = $all_certifications;
-    }
-
-    $company_social_media_data = $company_data['social_media'] ?? []; 
+    
+    $company_social_media_data=$company_info['social_media'];
     $social_media_urls = [];
     foreach ($company_social_media_data as $field_key => $link_value) {
         if (!empty($link_value)) { 
@@ -451,40 +392,86 @@ function _build_main_company_entity($company_data, $status) {
         }
     }
     $entity['sameAs'] = $social_media_urls;
-    $contact_page_id = $company_data['contact_page']??'';
-    if ($contact_page_id && !empty($company_data['phone_number'])) {
-        $contact_point = [
-            '@type' => 'ContactPoint',
-            'telephone' => _format_phone_number_e164($company_data['phone_number']),
-            'contactType' => 'customer service'
-        ];
-        $contact_url = get_permalink($contact_page_id);
-        if ($contact_url && !is_wp_error($contact_url)) {
-            $contact_point['url'] = $contact_url;
-        }
-        $entity['contactPoint'] = [$contact_point];
-    }
-    $country = $company_data['addy_country'];
-    if (empty($country)){
-        $country = 'US';
-    }
-    if ($status ==='multi_areas' || $status ==='none') {
-        $entity['telephone']  = $phone_number;
-        $entity['hasMap'] = $company_data['gmb_map_link'];
-        $entity['address'] = [
-            '@type' => 'PostalAddress',
-            'streetAddress'   => trim($company_data['street_address'] . ' ' . $company_data['street_address_2']),
-            'addressLocality' => $company_data['city'],
-            'addressRegion'   => $company_data['state'],
-            'postalCode'      => $company_data['zipcode'],
-            'addressCountry'  => $country
+     if ($show_address_on_org === "1") {
+        $entity['telephone']  = $telephone;
+        $entity['hasMap'] = $company_info['normal_map'];
+         $entity['address'] = [
+            '@type'           => 'PostalAddress',
+            'streetAddress'   => trim($company_info['street_address'] . ' ' . $company_info['street_address_2']),
+            'addressLocality' => $company_info['city'],
+            'addressRegion'   => $company_info['state'],
+            'postalCode'      => $company_info['zipcode'],
+            'addressCountry'  => $company_info['addy_country'] ?? 'US'
         ];
         $entity['geo'] = [
             '@type'     => 'GeoCoordinates',
-            'latitude'  => $company_data['latitude'],
-            'longitude' => $company_data['longitude']
+            'latitude'  => $company_info['latitude'],
+            'longitude' => $company_info['longitude']
         ];
-        $entity['openingHoursSpecification'] = _build_opening_hours_spec($company_data['hours_of_operation']);
+        $entity['openingHoursSpecification'] = build_opening_hours_spec($company_info['hours_of_operation']);
+   }
+   if ($show_address_on_org ==='0'){
+       if (DibracoSchemaEnv::$contact_page_url && !empty($company_info['phone_number'])) {
+            $entity['contactPoint'] = [[
+                '@type'       => 'ContactPoint',
+                'telephone'   => $telephone,
+                'contactType' => 'customer service',
+                'url'         => DibracoSchemaEnv::$contact_page_url
+            ]];
+        }
+    }
+   
+     $all_certifications = [];
+    
+    $enabled_type_contexts = get_option('enabled_type_contexts');
+    if (!empty($enabled_type_contexts)) {
+        foreach ($enabled_type_contexts as $type_context_data) {
+           if ($type_context_data['post_per_term'] === "1" && $type_context_data['has_certification'] !== '1'){ continue; }
+            $type_taxonomy = $type_context_data['taxonomy'];
+            $type_terms = get_terms(['taxonomy' => $type_taxonomy, 'hide_empty' => true]);
+            foreach ($type_terms as $type_term) {
+                if (get_term_meta($type_term->term_id, 'has_certification', true) !== '1') { continue; }
+                $cert_data = get_term_meta($type_term->term_id, 'certification_data', true);
+                
+                if (!empty($cert_data)){
+                    $term_cert_node = [
+                        '@type' => 'Certification',
+                        '@id' => DibracoSchemaEnv::$home_url . '#cert-' . $type_term->name,
+                        'name'  => $cert_data['certification_name'],
+                        'url'   => $cert_data['certification_url'],
+                        'description' => $cert_data['certification_description'],
+                        'certificationIdentification' => $cert_data['certification_id'],
+                        'validFrom' => $cert_data['certification_valid_from'],
+                        'expires' => $cert_data['certification_expires']
+                    ];
+
+                    if ($cert_data['certification_logo']) {
+                        $term_cert_node['logo'] = wp_get_attachment_url((int)$cert_data['certification_logo']);
+                    }
+                    if ($cert_data['certification_valid_in']) {
+                        $term_cert_node['validIn'] = [
+                            '@type' => 'AdministrativeArea',
+                            'name'  => $cert_data['certification_valid_in']
+                        ];
+                    }
+                    if ($cert_data['certification_issuer_name']) {
+                        $term_cert_node['issuedBy'] = [
+                            '@type' => 'Organization',
+                            'name'  => $cert_data['certification_issuer_name'],
+                            'url'   => $cert_data['certification_issuer_url']
+                        ];
+                    }
+                    
+                    $all_certifications[] = $term_cert_node;
+                }
+            }
+        }
+    }
+    if (!empty($all_certifications)) {
+         $entity['hasCertification'] = $all_certifications;
+    }
+
+   if ($status ==='multi_areas' || $status ==='none') {
         $enabled_type_contexts = get_option('enabled_type_contexts');
         $all_catalogs = [];
         foreach ($enabled_type_contexts as $type_context_name => $type_context_data) {
@@ -503,22 +490,18 @@ function _build_main_company_entity($company_data, $status) {
                 $offers_for_catalog[] = [
                     '@type' => 'Offer',
                     'itemOffered' => [
-                        '@type'       => 'Service',
-                        '@id'         => $service_url . '#service',
-                        'name'        => get_the_title($post_id),
-                        'url'         => $service_url,
-                        'serviceType' => $term->name
-                    ]
-                ];
+                        '@type' => 'Service',
+                        '@id' => $service_url . '#service',
+                        'name' => get_the_title($post_id),
+                        'url' => $service_url,
+                        'serviceType' => $term->name]];
             }
             $name_base = str_replace(['_', '-'], ' ', $type_post_type);
             $catalog_name = ucwords($name_base) . 's';
-
             $all_catalogs[] = [
-                '@type'           => 'OfferCatalog',
-                'name'            => $catalog_name,
-                'itemListElement' => $offers_for_catalog
-            ];
+                '@type' => 'OfferCatalog',
+                'name' => $catalog_name,
+                'itemListElement' => $offers_for_catalog ];
             }
             }
         }
@@ -532,18 +515,16 @@ function _build_main_company_entity($company_data, $status) {
         $location_terms = get_terms(['taxonomy' => $location_taxonomy, 'hide_empty' => true]);
         $location_stubs = [];
 		$main_term = '';
-		$ignore_main_term = get_option('enabled_connector_contexts')['locations']['ignore_main_term'] ?? '';
+		$ignore_main_term = get_option('enabled_connector_contexts')['locations']['ignore_main_term'];
 		if ($ignore_main_term === "1"){
-		$main_term = get_option('enabled_connector_contexts')['locations']['main_term'] ?? '';
+		$main_term = get_option('enabled_connector_contexts')['locations']['main_term'];
 		if ($main_term !==''){
 			$main_term = (int)$main_term;
 		}
-		}
-        if ($location_terms && !is_wp_error($location_terms)) {
-            foreach ($location_terms as $term) {
-				$term_id = $term->term_id; 
+        foreach ($location_terms as $term) {
+			$term_id = $term->term_id; 
 				if ($term_id === $main_term) {continue;}
-                $stub =_build_local_business_stub_from_data($term_id);
+                $stub =build_local_business_stub_from_data($term_id);
                 if (!empty($stub)) {
                     $location_stubs[] = $stub;
                 }
@@ -559,7 +540,7 @@ function _build_main_company_entity($company_data, $status) {
         $coordinate_pairs = [];
         if (!empty($service_area_terms)) {
             foreach ($service_area_terms as $term) {
-                $city = _build_city_objects_for_area_served($term->term_id);
+                $city = build_city_objects_for_area_served($term->term_id);
                 $service_areas[] = $city;
                 if (isset($city['geo'])) {
                     $coordinate_pairs[] = [$city['geo']['latitude'], $city['geo']['longitude']];
@@ -575,26 +556,21 @@ function _build_main_company_entity($company_data, $status) {
 
     return $entity;
 }
-
-function _build_local_business_entity_from_data($post_id, $location_term_id, $context_data, $status) {
-    $term_meta = get_term_meta($location_term_id);
-    $term_meta_data = [];
-    foreach ($term_meta as $key => $value) {
-        $term_meta_data[$key] = $value[0] ?? '';
+function build_local_business_entity_from_data($post_id, $location_term_id, $context_data) {
+    $term_meta_data = get_term_meta($location_term_id, '', true);
+    $term_meta_data = array_map('maybe_unserialize', array_map('current', $term_meta_data));
+    $location_page_url = $term_meta_data['location_link_url'];
+    if (empty($location_page_url)) {
+     return;
     }
-
-    $company_info = get_option('company_info');
-    $company_main_logo_id = $company_info['company_logo'];
-    $company_schema = $company_info['schema'];
-    $location_page_url = get_permalink($post_id);
-    $schema_type = $term_meta_data['schema'];
+    $company_info = DibracoSchemaEnv::$company_info;
     $location_logo_id = $term_meta_data['location_logo'];
     $schema_type = $term_meta_data['schema'];
     $exterior_image_id = $term_meta_data['exterior_image'];
-    $hours_data = get_term_meta($location_term_id, 'hours_of_operation', true) ?? [];
-    $social_media_data =  get_term_meta($location_term_id, 'social_media', true) ?? [];
+    $hours_data = $term_meta_data['hours_of_operation'];
+    $social_media_data =  $term_meta_data['social_media'];
     $location_description = '';
-    $location_description = get_post_meta($post_id, 'da_about_blurb', true) ?? '';
+    $location_description = get_post_meta($post_id, 'da_about_blurb', true);
     if ($location_description === '') {
         $location_description = get_post_meta($post_id, 'da_banner_description', true);
     }
@@ -603,13 +579,9 @@ function _build_local_business_entity_from_data($post_id, $location_term_id, $co
     }
     $street_address = trim($term_meta_data['street_address'] . ' ' . $term_meta_data['street_address_2']);
       if ($exterior_image_id !== '') {
-            $exterior_image_id = (int)$exterior_image_id;
+        $exterior_image_id = (int)$exterior_image_id;
+        $exterior_image_url = wp_get_attachment_image_url($exterior_image_id);
       }
-    $exterior_image_url = wp_get_attachment_image_url($exterior_image_id);
-    $parent_organization = ['@id' => home_url('/#organization') ];
-	if ($company_schema === "Corporation"){
-		$parent_organization= ['@id' => home_url('/#corporation') ];
-	}
 	$entity = [
         '@type'     => $schema_type,
         '@id'       => $location_page_url . '#' . strtolower($schema_type),
@@ -617,15 +589,13 @@ function _build_local_business_entity_from_data($post_id, $location_term_id, $co
         'url'       => $location_page_url,
         'description' => $location_description,
         'image'     => $exterior_image_url,
-        'telephone' => _format_phone_number_e164($term_meta_data['phone_number']),
+        'telephone' => format_phone_number_e164($term_meta_data['phone_number']),
         'email'     => $term_meta_data['email_address'],
         'faxNumber' => $term_meta_data['fax_number'],
-        'address'   => [
-            '@type'           => 'PostalAddress',
-            'streetAddress'   => $street_address,
+        'address'   => [ '@type' => 'PostalAddress', 'streetAddress'   => $street_address,
             'addressLocality' => $term_meta_data['city'],
             'addressRegion'   => $term_meta_data['state'],
-            'postalCode'      => $term_meta_data['zipcode'],
+            'postalCode' => $term_meta_data['zipcode'],
             'addressCountry'  => $term_meta_data['addy_country'],
         ],
         'geo' => [
@@ -633,25 +603,29 @@ function _build_local_business_entity_from_data($post_id, $location_term_id, $co
             'latitude'  => $term_meta_data['latitude'],
             'longitude' => $term_meta_data['longitude'],
         ],
-         'parentOrganization' => $parent_organization,
-         'hasMap' => $term_meta_data['gmb_map_link'],
-         'openingHoursSpecification' => _build_opening_hours_spec($hours_data),
+         'parentOrganization' => ['@id' => DibracoSchemaEnv::$company_entity_id],
+         'hasMap' => $term_meta_data['normal_map'],
+         'openingHoursSpecification' => build_opening_hours_spec($hours_data),
     ];
-    if ($location_logo_id !== $company_main_logo_id) {
-        $logo_url = wp_get_attachment_image_url($location_logo_id, 'full');
-        $logo_data = wp_get_attachment_metadata($location_logo_id);
-
-        if (!empty($logo_url)) {
-            $entity['logo'] = [
-                '@type'  => 'ImageObject',
-                '@id'    => $logo_url . '/#logo',
-                'url'    => $logo_url,
-                'width'  => $logo_data['width'] ?? null,
-                'height' => $logo_data['height'] ?? null,
-            ];
+    $location_logo_id = $term_meta_data['location_logo'];
+   if (!empty($location_logo_id) && $location_logo_id !== DibracoSchemaEnv::$company_info['company_logo']) {
+        $logo_url  = wp_get_attachment_image_url((int)$location_logo_id, 'full');
+        $logo_data = wp_get_attachment_metadata((int)$location_logo_id);
+        $entity['logo'] = [
+            '@type'  => 'ImageObject',
+            '@id'    => $logo_url . '/#logo',
+            'url'    => $logo_url,
+            'width'  => $logo_data['width'],
+            'height' => $logo_data['height'],
+        ];
+    } else {
+        if (!empty(DibracoSchemaEnv::$logo_node)) {
+            $entity['logo'] = ['@id' => DibracoSchemaEnv::$logo_node['@id']];
         }
     }
+    $social_media_data = $term_meta_data['social_media'];
     $social_media_urls = [];
+    
     foreach ($social_media_data as $field_key => $value) { 
         if (!empty($value)) {
               $social_media_urls[] = $value; 
@@ -659,14 +633,14 @@ function _build_local_business_entity_from_data($post_id, $location_term_id, $co
     }
     $entity['sameAs'] = $social_media_urls;
 
-    if ($status === 'both') {
-        $associated_area_ids = get_term_meta($location_term_id, 'associated_act_terms', true);
+    if (DibracoSchemaEnv::$status === 'both')  {
+        $associated_area_ids = $term_meta_data['associated_act_terms'];
 
         $service_areas = [];
         $coordinate_pairs = [];
 
         foreach ($associated_area_ids as $area_id) {
-                $city = _build_city_objects_for_area_served($area_id);
+                $city = build_city_objects_for_area_served($area_id);
                 $service_areas[] = $city;
                 if (isset($city['geo'])) {
                     $coordinate_pairs[] = [
@@ -682,7 +656,6 @@ function _build_local_business_entity_from_data($post_id, $location_term_id, $co
             $service_areas[] = ['@type' => 'GeoShape', 'polygon' => $polygon_string];
         }
         $entity['areaServed'] = $service_areas;
-
     } 
     if (!empty($context_data['related_type_contexts'])) {
         foreach (($context_data['related_type_contexts']) as $type_context_name => $type_context_data) {
@@ -717,134 +690,151 @@ function _build_local_business_entity_from_data($post_id, $location_term_id, $co
     return $entity;
 }
 
-
-function _build_service_area_entity($post_id, $term_id, $context_data, $status) {
-    $page_url = get_permalink($post_id);
+function build_service_area_entity($post_id, $term_id, $context_data) {
+    $status = DibracoSchemaEnv::$status;
     $term_object = get_term($term_id);
-    $main_provider_id = '';
+    $page_url = get_term_meta($term_id, 'service_area_link_url', true);
+    if ($page_url === '') {
+        return;
+    }
+
     $provider_stub = [];
     if ($status === 'both') {
-     $parent_loc_id = get_term_meta($term_id, 'area_parent_location_term', true);
-     if (!empty($parent_loc_id)){
-        $parent_loc_id = (int)$parent_loc_id;
-     $provider_stub = _build_local_business_stub_from_data($parent_loc_id);
-     }
-     if(empty($provider_stub)){
-     $provider_stub = _build_organization_stub_node($status);
-     }
-    } else { 
-     $provider_stub = _build_organization_stub_node($status);
+        $parent_loc_id = get_term_meta($term_id, 'area_parent_location_term', true);
+        if ($parent_loc_id !== '') {
+            $parent_loc_id = (int)$parent_loc_id;
+            $provider_stub = build_local_business_stub_from_data($parent_loc_id);
+        }
+    } else {
+        $provider_stub = DibracoSchemaEnv::$organization_stub_node;
     }
-    $area_description ='';
-    $area_description = get_post_meta($post_id, 'da_about_blurb', true) ?? '';
-    if ($area_description ===''){
-        $area_description = get_post_meta($post_id, 'da_banner_description', true) ?? '';
-    } 
-    if ($area_description !==''){
-         $area_description = strip_tags($area_description); 
+
+    $provider_id = '';
+    if (!empty($provider_stub['@id'])) {
+        $provider_id = $provider_stub['@id'];
+    } else {
+        $provider_id = DibracoSchemaEnv::$organization_stub_node['@id'];
     }
-    $entity = [
-        '@type'      => ['Service', 'City'],
-        '@id'        => $page_url . '#service',
-        'name'       => 'Services in ' . $term_object->name,
-        'description' => $area_description,
-        'url'        => $page_url,
-        'areaServed' => _build_city_objects_for_area_served($term_id),
-        'provider'   => ['@id' => $provider_stub['@id']],
+
+    $area_description = get_post_meta($post_id, 'da_about_blurb', true);
+    if ($area_description === '') {
+        $area_description = get_post_meta($post_id, 'da_banner_description', true);
+    }
+    if ($area_description !== '') {
+        $area_description = strip_tags($area_description);
+    }
+
+    $city_name = $term_object->name;
+
+    $area_served_nodes = [
+        ['@type' => 'City', 'name' => $city_name]
     ];
 
+    $bounding_box_json = get_term_meta($term_id, 'bounding_box', true);
+    if ($bounding_box_json !== '') {
+        $bounding_box = json_decode($bounding_box_json, true);
+        if (is_array($bounding_box)) {
+            $box_string = "{$bounding_box[0]} {$bounding_box[2]} {$bounding_box[1]} {$bounding_box[3]}";
+            $area_served_nodes[] = ['@type' => 'GeoShape', 'box' => $box_string];
+        }
+    }
+
+    $entity = [
+        '@type'        => ['Service', 'City'],
+        '@id'          => $page_url . '#service',
+        'name'         => 'Services in ' . $city_name,
+        'description'  => $area_description,
+        'url'          => $page_url,
+        'areaServed'   => $area_served_nodes,
+        'provider'     => ['@id' => $provider_id]
+    ];
 
     if (!empty($context_data['related_type_contexts'])) {
-        foreach (($context_data['related_type_contexts']) as $type_context_name => $type_context_data) {
-    if ($type_context_data['post_per_term'] === "1") {
-                
-                if ($type_context_data['schema'] === 'Service') {
-                    $new_catalog = build_offer_catalog_from_context($type_context_name, $type_context_data, $term_id);
-                    if ($new_catalog) {
-                        if (!isset($entity['hasOfferCatalog'])) {
-                            $entity['hasOfferCatalog'] = [];
-                        }
-                        $entity['hasOfferCatalog'][] = $new_catalog;
+        foreach ($context_data['related_type_contexts'] as $type_context_name => $type_context_data) {
+            if ($type_context_data['post_per_term'] === '1' && $type_context_data['schema'] === 'Service') {
+                $catalog = build_offer_catalog_from_context($type_context_name, $type_context_data, $term_id);
+                if ($catalog) {
+                    if (!isset($entity['hasOfferCatalog'])) {
+                        $entity['hasOfferCatalog'] = [];
                     }
-                } else {
-                    //placeholderfornonservice
+                    $entity['hasOfferCatalog'][] = $catalog;
                 }
-    } elseif ($type_context_data['post_per_term'] !== "1") {
-        //placeholderhere
-    }
-    }
-    }
-    if (!empty($context_data['related_unique_contexts'])){
-        foreach (($context_data['related_unique_contexts']) as $context_name => $context_def) {
-            if ($context_name === 'employee') {
-                continue;
             }
         }
     }
-    
+
     return $entity;
 }
 
-function _build_service_entity($post_id, $type_term_id, $context_data, $status) {
+function build_service_entity($post_id, $type_term_id, $context_data) {
+    $type_term_name = get_term($type_term_id)->name;
+    $status = DibracoSchemaEnv::$status;
     $page_url = get_permalink($post_id);
     $entity = [
         '@type' => 'Service',
         '@id'   => $page_url . '/#service',
         'url'   => $page_url,
     ];
-    $area_name = '';
-
-    if ($status === 'multi_areas') {
-        $service_areas_taxonomy = get_option('enabled_connector_contexts')['service_areas']['taxonomy'];
+    $related_connector_count = $context_data['related_connector_count'];
+    if ($related_connector_count === 2){
+        $related_connectors = $context_data['related_connectors'];
+        $service_areas_taxonomy= $related_connectors['service_areas']['taxonomy'];
+        $locations_taxonomy= $related_connectors['locations']['taxonomy'];
         $service_area_term_id = dibraco_get_current_term_id_for_post($post_id, $service_areas_taxonomy);
-        if ($service_area_term_id !== '') {
-            $entity['areaServed'] = _build_city_objects_for_area_served($service_area_term_id);
-            $area_name = get_term($service_area_term_id)->name;
-            $provider_stub = _build_organization_stub_node($status);
-            $entity['provider'] = ['@id' => $provider_stub['@id']];
+        if(!empty($service_area_term_id)){
+            $location_term_id = get_term_meta($service_area_term_id, 'area_parent_location_term', true);
+         }
+      if(empty($service_area_term_id)){
+            $location_term_id = dibraco_get_current_term_id_for_post($post_id, $locations_taxonomy);
+            }
+         }
+      if ($related_connector_count === 1){
+          if ($status === 'multi_areas') {
+             $service_areas_taxonomy = get_option('enabled_connector_contexts')['service_areas']['taxonomy'];
+             $service_area_term_id = dibraco_get_current_term_id_for_post($post_id, $service_areas_taxonomy);
+          }
+        if ($status === 'multi_locations') {
+             $locations_taxonomy = get_option('enabled_connector_contexts')['locations']['taxonomy'];
+             $location_term_id = dibraco_get_current_term_id_for_post($post_id, $locations_taxonomy);
         }
-    } elseif ($status === 'multi_locations') {
-        $locations_taxonomy = get_option('enabled_connector_contexts')['locations']['taxonomy'];
-        $location_term_id = dibraco_get_current_term_id_for_post($post_id, $locations_taxonomy);
-        if ($location_term_id !== '') {
-            $provider_stub = _build_local_business_stub_from_data($location_term_id);
-            $entity['provider'] = $provider_stub;
-            $location_city_name = get_term($location_term_id)->name;
-            $entity['areaServed'] = ['@type' => 'City', 'name' => $location_city_name];
-            $area_name = $location_city_name;
-        } else {
-            $provider_stub = _build_organization_stub_node($status);
-            $entity['provider'] = ['@id' => $provider_stub['@id']];
+      }
+     if($service_area_term_id !==''){
+            $city_name = get_term_meta($service_area_term_id, 'city', true);
+            $area_served_nodes[] = ['@type' => 'City', 'name'  => $city_name,];
+            $bounding_box_json = get_term_meta($service_area_term_id, 'bounding_box', true);
+            if (!empty($bounding_box_json)) {
+            $bounding_box = json_decode($bounding_box_json, true);
+                $box_string = "{$bounding_box[0]} {$bounding_box[2]} {$bounding_box[1]} {$bounding_box[3]}";
+                $area_served_nodes[] = ['@type' => 'GeoShape',  'box'   => $box_string];
+            }
+     }
+     if($location_term_id !==''){
+         if($service_area_term_id ===''){
+             $city_name = get_term_meta($location_term_id, 'city', true);
+             $area_served_nodes[] = ['@type' => 'City', 'name'  => $city_name,];
+            $bounding_box_json = get_term_meta($location_term_id, 'bounding_box', true);
+        if (!empty($bounding_box_json)) {
+            $bounding_box = json_decode($bounding_box_json, true);
+                $box_string = "{$bounding_box[0]} {$bounding_box[2]} {$bounding_box[1]} {$bounding_box[3]}";
+                $area_served_nodes[] = ['@type' => 'GeoShape',  'box'   => $box_string];
+            }
         }
-    } elseif ($status === 'both') {
-        $relevant_location_term_id = da_get_location_term_or_default($post_id);
-        if ($relevant_location_term_id !== null) {
-            $provider_stub = _build_local_business_stub_from_data($relevant_location_term_id);
-            $entity['provider'] = $provider_stub;
-            $service_areas_taxonomy = get_option('enabled_connector_contexts')['service_areas']['taxonomy'];
-            $current_service_area_term_id = dibraco_get_current_term_id_for_post($post_id, $service_areas_taxonomy);
+        $provider_stub = build_local_business_stub_from_data($location_term_id);
+        $entity['provider'] = ['@id' => $provider_stub['@id']];
 
-            if (!empty($current_service_area_term_id)) {
-                $entity['areaServed'] = _build_city_objects_for_area_served($current_service_area_term_id);
-                $area_name = get_term($current_service_area_term_id)->name;
-            } else {
-                $location_city_name = get_term($relevant_location_term_id)->name;
-                $entity['areaServed'] = ['@type' => 'City', 'name' => $location_city_name];
-                $area_name = $location_city_name;
-            }
-        } else {
-            $provider_stub = _build_organization_stub_node($status);
-            $entity['provider'] = ['@id' => $provider_stub['@id']];
-            $company_info = get_option('company_info');
-            if (!empty($company_info['city'])) {
+     }
+    if ($location_term_id ==='' && $service_area_term_id ===''){
+          if (!empty($company_info['city'])) {
                 $entity['areaServed'] = ['@type' => 'City', 'name' => $company_info['city']];
-                $area_name = $company_info['city'];
-            }
-        }
-    }
-    
+                   $city_name = $company_info['city'];
+                }
+              $provider_stub = DibracoSchemaEnv::$organization_stub_node;
+                  $entity['provider'] = ['@id' => $provider_stub['@id']];
+             }
     $service_type_name = get_term($type_term_id)->name;
-    $entity['name'] = !empty($area_name) ? "{$service_type_name} in {$area_name}" : $service_type_name;
+///note to future self do something here if locations aren't enabled and if other things
+$entity['name'] ="{$service_type_name} in {$city_name}";
+    $entity['serviceType'] = $service_type_name;
 
     if ($context_data['dibraco_banner'] === '1') {
         $banner_description = get_post_meta($post_id, 'da_banner_description', true);
@@ -854,7 +844,7 @@ function _build_service_entity($post_id, $type_term_id, $context_data, $status) 
         }
     }
     $image_found = false;
-    if ($context_data['repeater_images'] === '1') {
+    if ($context_data['landscape_images'] === '1') {
         $landscape_image = get_post_meta($post_id, 'dibraco_landscape_1', true);
         if (!empty($landscape_image)) {
             $entity['image'] = wp_get_attachment_url($landscape_image);
@@ -864,54 +854,42 @@ function _build_service_entity($post_id, $type_term_id, $context_data, $status) 
     if (!$image_found && has_post_thumbnail($post_id)) {
         $entity['image'] = get_the_post_thumbnail_url($post_id, 'full');
     }
-    $entity['serviceType'] = $service_type_name;
-    
+
     if (($context_data['has_certification']) === '1') {
-        $has_certification_term_meta = get_term_meta($type_term_id, 'has_certification', true);
+        $cert_data = get_term_meta($type_term_id, 'certification_data', true);
+        if (!empty($cert_data)) { 
+            $has_certification_term_meta = get_term_meta($type_term_id, 'has_certification', true);
+                if (!empty($has_certification_term_meta ==="1")){
+                    $term_cert_node = [
+                        '@type' => 'Certification',
+                        '@id' => DibracoSchemaEnv::$home_url . '#cert-' . $type_term_name,
+                        'name'  => $cert_data['certification_name'],
+                        'url'   => $cert_data['certification_url'],
+                        'description' => $cert_data['certification_description'],
+                        'certificationIdentification' => $cert_data['certification_id'],
+                        'validFrom' => $cert_data['certification_valid_from'],
+                        'expires' => $cert_data['certification_expires']
+                    ];
 
-        if ($has_certification_term_meta === "1") { 
-            $certification_data = get_term_meta($type_term_id, 'certification_data', true);
-
-            $certification_node = [
-                '@type' => 'Certification',
-                '@id'   => $page_url . '#certification',
-                'name'  => $certification_data['certification_name'],
-                'url'   => $certification_data['certification_url'],
-                'description' => $certification_data['certification_description'],
-                'certificationIdentification' => $certification_data['certification_id'],
-                'about' => $certification_data['certification_about'],
-            ];
-            if (!empty($certification_data['certification_logo'])) {
-                $cert_logo_id = (int)$certification_data['certification_logo'];
-                $certification_node['logo'] = wp_get_attachment_url($cert_logo_id);
-            }
-
-            if (!empty($certification_data['certification_valid_from'])) {
-                $certification_node['validFrom'] = date('Y-m-d', strtotime($certification_data['certification_valid_from']));
-            }
-if (!empty($certification_data['certification_valid_in'])) { // Including validIn as you specified
-            $certification_node['validIn'] = [
-                '@type' => 'AdministrativeArea',
-                'name' => $certification_data['certification_valid_in']
-            ];
-        }
-            if (!empty($certification_data['certification_expires'])) {
-                $certification_node['expires'] = date('Y-m-d', strtotime($certification_data['certification_expires']));
-            }
-
-           
-            if (!empty($certification_data['certification_issuer_name'])) {
-                $certification_node['issuedBy'] = [
-                    '@type' => 'Organization',
-                    'name' => $certification_data['certification_issuer_name'],
-                    'url' => $certification_data['certification_issuer_url']
-                ];
-            }
-
-            $entity['hasCertification'] = $certification_node;
-        } 
-    }
-
+                    if ($cert_data['certification_logo']) {
+                        $term_cert_node['logo'] = wp_get_attachment_url((int)$cert_data['certification_logo']);
+                    }
+                    if ($cert_data['certification_valid_in']) {
+                        $term_cert_node['validIn'] = [
+                            '@type' => 'AdministrativeArea',
+                            'name'  => $cert_data['certification_valid_in']
+                        ];
+                    }
+                    if ($cert_data['certification_issuer_name']) {
+                        $term_cert_node['issuedBy'] = [
+                            '@type' => 'Organization',
+                            'name'  => $cert_data['certification_issuer_name'],
+                            'url'   => $cert_data['certification_issuer_url']
+                        ];
+                    }
+                   $entity['hasCertification']=$term_cert_node;
+                }
+        }}
     return $entity;
 }
 
@@ -933,23 +911,6 @@ function build_rows_post_per_term($type_context_name, $context_data, $connector_
             'url'   => $url,
             'servicetype' => $term_name
         ];
-    }
-    return $rows;
-}
-
-function get_display_rows_multi_post($context_name, $context_data, $term_id) {
-    $meta_key = "related_type_{$context_name}";
-    $full_data = get_term_meta($term_id, $meta_key, true);
-    if (!is_array($full_data)) {return [];} 
-    $rows = [];
-    foreach ($full_data as $type_term_id => $posts) {
-        if (!is_array($posts)) { continue;  } 
-        foreach ($posts as $post_id => $entry) {
-            $rows[] = [ 
-                'title' => $entry['related_post_title'],
-                'url'   => $entry['related_post_url'],
-                ];
-        }
     }
     return $rows;
 }
@@ -983,40 +944,36 @@ function build_offer_catalog_from_context($type_context_name, $type_context_data
     return $offer_catalog_entity;
 }
 
-function _build_local_business_stub_from_data($term_id) {
-    $url = get_term_meta($term_id, 'location_link_url', true);
-    if($url === ''){
-        return [];
-    }
-    $phone = get_term_meta($term_id, 'phone_number', true);
-    $schema_type = get_term_meta($term_id, 'schema', true);
-    $name = get_term_meta($term_id, 'location_name', true);
+function build_local_business_stub_from_data($location_term_id) {
+    $term_meta_data = get_term_meta($location_term_id, '', true);
+    $term_meta_data = array_map('maybe_unserialize', array_map('current', $term_meta_data));
+    $url = $term_meta_data['location_link_url'];
+    if($url === '')
+    $company_info= DibracoSchemaEnv::$company_info;
+    $phone = $term_meta_data['phone_number'];
+    $schema_type = $term_meta_data['schema'];
+    $name = $term_meta_data['location_name'];
     if ($name ==='') {
         $name = get_option('company_info')['name'];
     }
-    $hours_data = get_term_meta($term_id, 'hours_of_operation', true);
-        if (!is_array($hours_data)) {
-        $hours_data = []; 
-    }
-    $exterior_image_id =  get_term_meta($term_id, 'exterior_image', true);
+    $hours_data = $term_meta_data['hours_of_operation'];
+    $exterior_image_id =  $term_meta_data['exterior_image'];
     if ($exterior_image_id!==''){
         $exterior_image_id= (int)$exterior_image_id;
       $exterior_image_url = wp_get_attachment_image_url($exterior_image_id);
     }
-	$company_schema = get_option('company_info')['schema'];
-	$parent_organization = ['@id' => home_url('/#organization')];
-	if ($company_schema === 'Corporation'){
-		$parent_organization = ['@id' => home_url('/#corporation')];
-	}
-	$street_address = get_term_meta($term_id, 'street_address', true);
-	$city = get_term_meta($term_id, 'city', true);
-	$state = get_term_meta($term_id, 'state', true);
-	$zipcode = get_term_meta($term_id, 'zipcode', true);
-    $country =  get_term_meta($term_id, 'addy_country', true);
-    $lat = get_term_meta($term_id, 'latitude', true);
-    $long = get_term_meta($term_id, 'longitude', true);
-    $map =   get_term_meta($term_id, 'gmb_map_link', true);
-    $status = get_option('locations_areas_status');
+	$parent_organization =  ['@id' => DibracoSchemaEnv::$company_entity_id];
+	
+    $street_address  = $term_meta_data['street_address'];
+    $street_address_2 = $term_meta_data['street_address_2'];
+    $city = $term_meta_data['city'];
+    $state = $term_meta_data['state'];
+    $zipcode = $term_meta_data['zipcode'];
+    $country = $term_meta_data['addy_country'];
+    $lat = $term_meta_data['latitude'];
+    $long = $term_meta_data['longitude'];
+    $map = $term_meta_data['normal_map'];
+    $status = DibracoSchemaEnv::$status;
         $stub = [
         '@type' => $schema_type,
         '@id'   => $url . '#' . strtolower($schema_type),
@@ -1038,27 +995,25 @@ function _build_local_business_stub_from_data($term_id) {
             'longitude' => $long,
         ],
         'hasMap' => $map,
-        'telephone' =>  _format_phone_number_e164($phone),
-        'openingHoursSpecification' => _build_opening_hours_spec($hours_data),
+        'telephone' =>  format_phone_number_e164($phone),
+        'openingHoursSpecification' => build_opening_hours_spec($hours_data),
         'parentOrganization' => $parent_organization
     ];
     
     return $stub;
 }
-function _build_city_objects_for_area_served($term_id) {
-    $service_area_name = get_term($term_id)->name;
-    $city = get_term_meta($term_id, 'city', true);
+function build_city_objects_for_area_served($service_area_term_id) {
+    $service_area_name = get_term($service_area_term_id)->name;
+    $city = get_term_meta($service_area_term_id, 'city', true);
     if ($city === '') {
         $city = $service_area_name;
     }
-
     $city_object = [
         '@type' => 'City',
         'name'  => $city,
     ];
-
-    $latitude  = get_term_meta($term_id, 'latitude', true);
-    $longitude = get_term_meta($term_id, 'longitude', true);
+    $latitude  = get_term_meta($service_area_term_id, 'latitude', true);
+    $longitude = get_term_meta($service_area_term_id, 'longitude', true);
 
     if (!empty($latitude) && !empty($longitude)) {
         $city_object['geo'] = [
@@ -1067,13 +1022,11 @@ function _build_city_objects_for_area_served($term_id) {
             'longitude' => $longitude
         ];
     }
-
-    $url = get_term_meta($term_id, 'service_area_link_url', true);
+    $url = get_term_meta($service_area_term_id, 'service_area_link_url', true);
     if (!empty($url)) {
         $city_object['url'] = $url;
         $city_object['@id'] = $url . '#city';
     }
-
     return $city_object;
 }
 
@@ -1110,7 +1063,7 @@ function create_geoshape_polygon_string_from_service_areas($coordinate_pairs) {
 
 
 
-function _format_phone_number_e164($phone) {
+function format_phone_number_e164($phone) {
   $extension = '';
     $main_number = $phone;
     if (preg_match('/(ext|ext\.|x|#)\s*(\d+)/i', $phone, $matches)) {
@@ -1126,9 +1079,9 @@ function _format_phone_number_e164($phone) {
     }
     return '';
 }
-function _build_opening_hours_spec($hours_data) {
+function build_opening_hours_spec($hours_data) {
   $days_map =  get_dibraco_day_map();
-  if (($hours_data['open_247']) === "1") {
+  if ($hours_data['open_247'] === "1") {
         $all_days_schema = [];
         foreach ($days_map as $day_full => $_) {
             $all_days_schema[] = 'https://schema.org/' . ucfirst($day_full);

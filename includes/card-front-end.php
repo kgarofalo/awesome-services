@@ -37,21 +37,10 @@ function get_type_posts_for_cards_no_connector($context_data, $selected_terms, $
             }
         }
     }
-    if (empty($connector_term)) {
-        $connector_term = get_option('company_info')['city'] ?? '';
-    }
     if ($post_per_term !== "1") {
         foreach ($selected_terms as $term_id) {
         $term_name = get_term($term_id)->name;
-        $posts = get_posts([
-        'post_type'      => $post_type,
-        'posts_per_page' => -1,
-        'tax_query'      => [[
-            'taxonomy' => $type_taxonomy,
-            'field'    => 'term_id',
-            'terms'    => [$term_id],
-        ]],
-    ]);
+        $posts = get_posts([ 'post_type' => $post_type, 'posts_per_page' => -1,'tax_query' => [['taxonomy' => $type_taxonomy, 'field' => 'term_id', 'terms' => [$term_id]]]]);
     if (empty($posts)){ return $cards;}
          foreach ($posts as $post) {
         $related_post_id = $post->ID;
@@ -62,8 +51,9 @@ function get_type_posts_for_cards_no_connector($context_data, $selected_terms, $
     }
       return $cards;
     } else {
-        $post_map_key = "{$context_name}_main_posts";
-        $main_post_map = get_option($post_map_key);
+        $context_name = $context_data['context_name'];
+        $main_post_option_name = "{$context_name}_main_posts";
+        $main_post_map = get_option($main_post_option_name);
         $main_post_ids = array_intersect_key($main_post_map, array_flip($selected_terms));
         foreach ($main_post_ids as $type_term_id => $main_post_id) {
             $related_post_title = get_the_title($main_post_id);
@@ -102,7 +92,6 @@ function get_service_area_posts_for_cards ($context_data, $status, $current_post
     $service_areas_taxonomy = $context_data['taxonomy'];
     if ($status ==='multi_areas'){
         $all_service_area_terms = get_terms(['taxonomy' => $service_areas_taxonomy, 'hide_empty' => true, 'fields' => 'ids']);
-        if (empty($all_service_area_terms)) {return $cards;}
         foreach ($all_service_area_terms as $term_id) {
             $post_id = get_term_meta($term_id, "service_area_post_id", true);
             $link_url = get_term_meta($term_id, "service_area_link_url", true);
@@ -201,7 +190,6 @@ function get_unique_posts_no_connector($context_data){
   $cards = [];
   $post_type = $context_data['post_type'];
   $posts = get_posts(['post_type' => $post_type, 'posts_per_page' => -1]);
-        if (empty($posts)){return $cards;}
         foreach ($posts as $post) {
             $cards[] = [
                 'related_post_id' => $post->ID, 
@@ -271,6 +259,7 @@ switch ($context_type){
     case 'type':
         $type_taxonomy = $context_data['taxonomy'];
         $post_per_term = $context_data['post_per_term'];
+        $related_connector_count =  $context_data['related_connector_count'];
         $selected_terms = [];
         if ($card_style_settings !==''){
         $selected_terms = $card_style_settings['selected_terms'];
@@ -291,15 +280,12 @@ function dibraco_cards_shortcode_handler($atts) {
     $variant_index = $atts['variant']; 
     $target_context_name = $atts['context'];
     $enabled_context = get_option('enabled_contexts')[$target_context_name];
-    if ($enabled_context === '') {
-        return 'Context Is Not Enabled Or Does Not Exist.';
+    $all_variants = get_option("{$target_context_name}_card_styles", []);
+   $card_style_settings = $all_variants[$variant_index];
+        if (empty($card_style_settings) && $variant_index !== 0) {
+        $card_style_settings = $all_variants[0] ?? null;
     }
-    $settings_key = "{$target_context_name}_card_styles_$variant_index";
-    $card_style_settings = get_option($settings_key);
-    if (empty($card_style_settings) && $variant_index !== '0') {
-        $settings_key = "{$target_context_name}_card_styles_0";
-        $card_style_settings = get_option($settings_key);
-    }
+
     if (empty($card_style_settings)) {
         return 'Card Style Settings Do Not Exist';
     }
@@ -308,14 +294,12 @@ function dibraco_cards_shortcode_handler($atts) {
     $context_type = $enabled_context['context_type'];
     $current_post_id = get_the_ID();
     $cards = get_the_context_by_status($context_type, $target_context_name, $context_data, $current_post_id, $status, $card_style_settings);
-     
     $css_context_name  = str_replace('_', '-', $target_context_name); 
-
     $uploads = wp_upload_dir();
-    $css_file = $uploads['basedir'] . "/awesome-services/css/card-{$css_context_name}-{$variant_index}.css";
-    $css_url = $uploads['baseurl'] . "/awesome-services/css/card-{$css_context_name}-{$variant_index}.css";
+    $css_file = $uploads['basedir'] . "/awesome-services/css/card-styles-{$css_context_name}-{$variant_index}.css";
+    $css_url = $uploads['baseurl'] . "/awesome-services/css/card-styles-{$css_context_name}-{$variant_index}.css";
     if (file_exists($css_file)) {
-        wp_enqueue_style("card-style-{$css_context_name}-{$variant_index}", $css_url);
+        wp_enqueue_style("card-styles-{$css_context_name}-{$variant_index}", $css_url);
     
     }
 $cards_html = '';
@@ -341,7 +325,6 @@ foreach ($cards as $card) {
         if (empty($image_id)) {
             $image_id = get_post_thumbnail_id($card['related_post_id']);
         }
-
         if ($image_id) {
             $image_url = wp_get_attachment_image_url($image_id, 'medium');
            $sortable_content[$card_style_settings['cards_image_position']] = '<div class="'.esc_attr("{$css_context_name}-image-section card-image-wrap").'"><img class="card-image" src="'.esc_url($image_url).'" alt="'.esc_attr($card['related_post_title']).'" title="'.esc_attr($card['related_post_title']).'"></div>';
@@ -379,7 +362,10 @@ function get_type_post_per_term($context_name, $term_id, $selected_terms) {
     $saved_data = get_term_meta($term_id, $meta_key, true);
     $related_posts = [];
     foreach ($saved_data as $type_term_id => $entry) {
-        if (in_array($type_term_id, $selected_terms)) {
+                if (!in_array($type_term_id, $selected_terms)) {
+            continue; 
+        }
+
             $term_name = get_term($type_term_id)->name;
             if (!empty($entry['related_post_id'])) {
                 $url = $entry['related_post_url'];
@@ -396,8 +382,6 @@ function get_type_post_per_term($context_name, $term_id, $selected_terms) {
                 'related_term_name' => $term_name
             ];
         }
-    }
-
     return $related_posts;
 }
 

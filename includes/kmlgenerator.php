@@ -1,105 +1,73 @@
 <?php
-function prepare_saved_maps_table_data() {
-    $saved_maps = get_option('dibraco_saved_kml_maps', []);
-    $table_rows = [];
-    if (!empty($saved_maps)) {
-        foreach ($saved_maps as $config_id) {
-            if (!get_option($config_id)) {
-                continue;
-            }
-            $map_name = get_kml_config_map_name($config_id); 
-            $shortcode = '[filtered_locations_list config_id="' . esc_attr($config_id) . '"]';
-            $download_url = add_query_arg('download_custom_kml', $config_id, home_url('/'));
-
-            $delete_form = '<form method="POST" action="" style="display:inline-block; margin-left: 5px;">';
-            $delete_form .= '<input type="hidden" name="dibraco_action" value="delete_kml_config">';
-            $delete_form .= '<input type="hidden" name="config_id" value="' . esc_attr($config_id) . '">';
-            $delete_form .= wp_nonce_field('delete_kml_config_' . $config_id, '_wpnonce', true, false);
-            $delete_form .= '<button type="submit" class="button" onclick="return confirm(\'Are you sure you want to delete this map configuration?\');" style="color: #a00; border-color: #a00;">Delete</button>';
-            $delete_form .= '</form>';
-
-            $cell1 = esc_html($map_name);
-            $cell2 = '<input type="text" value="' . esc_attr($shortcode) . '" readonly style="width: 100%;">';
-            $cell3 = '<a href="' . esc_url($download_url) . '" class="button">Download KML</a>' . $delete_form;
-
-            $table_rows[] = [$cell1, $cell2, $cell3];
-        }
-    }
-    return [
-        'title'   => '',
-        'headers' => ['Map Name', 'Shortcode', 'Actions'],
-        'styles'  => ['width: 30%;', 'width: 40%;', 'width: 30%;'],
-        'rows'    => $table_rows,
-         'colspan' => 3,
-    ];
-}
-
 function render_kml_generator_page() {
-        if ( isset($_POST['dibraco_action']) ) {
-
-        if ( $_POST['dibraco_action'] === 'delete_kml_config' ) {
-            if ( isset($_POST['config_id'], $_POST['_wpnonce']) && wp_verify_nonce($_POST['_wpnonce'], 'delete_kml_config_' . $_POST['config_id']) ) {
-            $config_id = $_POST['config_id'];
-            delete_option($config_id);
-            $saved_maps = get_option('dibraco_saved_kml_maps', []);
-            $saved_maps = array_diff($saved_maps, [$config_id]);
-            update_option('dibraco_saved_kml_maps', $saved_maps, 'no');
-            wp_redirect(admin_url('admin.php?page=dibraco-relationships-kml-generator&status=deleted'));
-            exit();
-            }
-        }
-        elseif ( $_POST['dibraco_action'] === 'create_kml_config' ) {
-            if (!isset($_POST['kml_filter_nonce']) || !wp_verify_nonce($_POST['kml_filter_nonce'], 'generate_filtered_kml_action')) {
-                wp_die();
-            }
-            $filters = $_POST['filters'] ?? [];
-            if (empty(array_filter($filters))) {
-                wp_redirect(admin_url('admin.php?page=dibraco-relationships-kml-generator&error=no_filters'));
-                exit();
-            }
-            $sanitized_filters = [];
-            foreach ($filters as $taxonomy => $term_ids) {
-                if (!empty($term_ids)) {
-                    $sanitized_filters[sanitize_key($taxonomy)] = array_map('intval', $term_ids);
-                }
-            }
-            $config_id = 'kml_config_' . wp_generate_password(12, false);
-            update_option($config_id, $sanitized_filters, 'no');
-            $saved_maps = get_option('dibraco_saved_kml_maps', []);
-            $saved_maps[] = $config_id;
-            update_option('dibraco_saved_kml_maps', array_unique($saved_maps), 'no');
-            wp_redirect(admin_url('admin.php?page=dibraco-relationships-kml-generator&config_id=' . $config_id . '&status=created'));
-            exit();
-            }
-        }
     ?>
     <div class="wrap">
         <h1>KML Map Generator</h1>
+
         <?php
-        if (isset($_GET['error']) && $_GET['error'] === 'no_filters') {
-            echo '<div id="message" class="error notice is-dismissible"><p>Please select at least one filter to generate a map.</p></div>';
+        if (isset($_GET['status']) && $_GET['status'] === 'created' && isset($_GET['config_id'])) {
+            $config_id = $_GET['config_id'];
+            if (get_option($config_id)) {
+               $download_url = add_query_arg('download_custom_kml', $config_id, home_url('/'));
+                $shortcode = '[filtered_locations_list config_id="' . $config_id . '"]';
+                echo '<div id="message" class="updated notice is-dismissible"><p><strong>Your custom map configuration has been saved.</strong></p><p><strong>Download Link:</strong><br><a href="'.esc_url($download_url).'">'.esc_url($download_url).'</a></p><p><strong>Shortcode:</strong><br><input type="text" value="'.esc_attr($shortcode).'" readonly style="width:100%;max-width:500px;padding:5px;"></p></div>';
+            }
         }
         if (isset($_GET['status']) && $_GET['status'] === 'deleted') {
             echo '<div id="message" class="updated notice is-dismissible"><p>Map configuration deleted successfully.</p></div>';
         }
-        if (isset($_GET['status']) && $_GET['status'] === 'created' && isset($_GET['config_id'])) {
-            $shortcode = '[filtered_locations_list config_id="' . esc_attr($_GET['config_id']) . '"]';
-            echo '<div id="message" class="updated notice is-dismissible"><p>Map created successfully! Shortcode: <input type="text" value="' . esc_attr($shortcode) . '" readonly style="width: 100%; max-width: 400px;"></p></div>';
+        if (isset($_GET['error']) && $_GET['error'] === 'no_filters') {
+            echo '<div id="message" class="error notice is-dismissible"><p>Error: You must select at least one filter to generate a map.</p></div>';
         }
         ?>
+
         <h2>Saved Maps</h2>
-        <?php
-        $saved_maps_table_data = prepare_saved_maps_table_data();
-        render_dibraco_admin_table($saved_maps_table_data);
-        ?>
+        <table class="wp-list-table widefat striped">
+            <thead>
+                <tr>
+                    <th style="width: 30%;">Map Name</th>
+                    <th style="width: 40%;">Shortcode</th>
+                    <th style="width: 30%;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                $saved_maps = get_option('dibraco_saved_kml_maps', []);
+                if (!empty($saved_maps)) {
+                    foreach ($saved_maps as $config_id) {
+                        if (!get_option($config_id)) continue; 
+                        $map_name = get_kml_config_map_name($config_id);
+                        $shortcode = '[filtered_locations_list config_id="' . $config_id . '"]';
+                        $download_url = add_query_arg('download_custom_kml', $config_id, home_url('/'));
+                        $delete_nonce = wp_create_nonce('delete_kml_config_' . $config_id);
+                        $delete_url = admin_url('admin.php?action=delete_kml_config&config_id=' . $config_id . '&_wpnonce=' . $delete_nonce);
+                        ?>
+                        <tr>
+                            <td><?php echo esc_html($map_name); ?></td>
+                            <td><input type="text" value="<?php echo $shortcode; ?>" readonly style="width: 100%;"></td>
+                            <td>
+                                <a href="<?php echo esc_url($download_url); ?>" class="button">Download KML</a>
+                                <a href="<?php echo esc_url($delete_url); ?>" class="button" onclick="return confirm('Are you sure you want to delete this map configuration?');" style="color: #a00; border-color: #a00;">Delete</a>
+                            </td>
+                        </tr>
+                        <?php
+                    }
+                } else {
+                    echo '<tr><td colspan="3">No saved maps found.</td></tr>';
+                }
+                ?>
+            </tbody>
+        </table>
+
         <h2 style="margin-top: 40px;">Create New Map</h2>
         <?php
         $enabled = get_option('enabled_connector_contexts');
         $location_post_type = $enabled['locations']['post_type'];
+        $location_taxonomy_slug = $enabled['locations']['taxonomy'];
         $all_taxonomies = get_object_taxonomies($location_post_type, 'objects');
         ?>
-      <form method="POST" action="">
-            <input type="hidden" name="dibraco_action" value="create_kml_config">
+        <form method="POST" action="<?php echo admin_url('admin-post.php'); ?>">
+            <input type="hidden" name="action" value="generate_filtered_kml">
             <?php wp_nonce_field('generate_filtered_kml_action', 'kml_filter_nonce'); ?>
             <p>Select filters below to generate a new KML map and shortcode.</p>
             <?php
@@ -122,167 +90,10 @@ function render_kml_generator_page() {
     </div>
     <?php
 }
-
-function get_filtered_location_ids_from_config($config_id) {
-    $filters = get_option($config_id);
-    $enabled = get_option('enabled_connector_contexts');
-    $location_post_type = $enabled['locations']['post_type'];
-    $location_taxonomy_slug = $enabled['locations']['taxonomy'];
-    $tax_query = ['relation' => 'AND'];
-    foreach ($filters as $taxonomy => $term_ids) {
-        if (!empty($term_ids)) {
-            $tax_query[] = ['taxonomy' => sanitize_key($taxonomy),'field'    => 'term_id', 'terms'    => array_map('intval', $term_ids),
-            ];
-        }
-    }
-    if (count($tax_query) > 1) {
-        $args = ['post_type' => $location_post_type, 'posts_per_page' => -1, 'tax_query' => $tax_query, 'fields' => 'ids'];
-        $matching_post_ids = get_posts($args);
-        if (!empty($matching_post_ids)) {
-            $term_ids = wp_get_object_terms($matching_post_ids, $location_taxonomy_slug, ['fields' => 'ids']);
-            if (!is_wp_error($term_ids)) {
-                return array_unique($term_ids);
-            }
-        }
-    }
-    return [];
-}
-function filtered_locations_list_shortcode($atts) {
-    $config_id = $atts['config_id'] ?? '';
-    if (empty($config_id) || get_option($config_id) === false) {
-        return '';
-    }
-    $enabled_context = get_option('enabled_connector_contexts')['locations'];
-    $location_taxonomy_slug = $enabled_context['taxonomy'];
-    $location_post_type = $enabled_context['post_type'];
-    $location_term_ids = get_filtered_location_ids_from_config($atts['config_id']);
-     if (empty($location_term_ids)) {
-        return '';
-    }
-    $cards_html = '';
-    foreach ($location_term_ids as $location_term_id) {
-        $cards_html .= render_location_term_card($location_term_id);
-    }
-    if (empty($cards_html)) {
-        return '';
-    }
-    $output = '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0; list-style: none;">';
-    $output .= $cards_html;
-    $output .= '</div>';
-    return $output;
-}
-add_shortcode('filtered_locations_list', 'filtered_locations_list_shortcode');
-
-
-function render_location_term_card($location_term_id, $display_areas = 'no') {
-$lat = get_term_meta($location_term_id, 'latitude', true);
-  if (empty($lat)) { return ''; }
-    $details = da_get_display_data($location_term_id, 'location');
-    $name = esc_html($details['name']);
-    $link_url = $details['link_url'];
-    $phone = $details['phone'];
-    $additional_phone = $details['additional_phone']??'';
-    $address_lines = array_filter([
-        $details['address_parts']['street_address'],
-        $details['address_parts']['street_address_2'],
-        implode(' ', array_filter([$details['address_parts']['city'] . ',', $details['address_parts']['state'], $details['address_parts']['zipcode']]))
-    ]);
-    $hours = $details['hours'];
-    $area_term_ids = []; 
-    $service_areas_html = '';
-    if ($display_areas ==='yes' && get_option('locations_areas_status') ==='both'){
-        $area_term_ids = get_term_meta($location_term_id, 'associated_act_terms', true);
-        if (!empty($area_term_ids)){
-            $area_links = [];
-            foreach ($area_term_ids as $area_id) {
-                $area_term_name = get_term($area_id)->name;
-                $area_link_url = get_term_meta($area_id, 'service_area_link_url', true);
-                $area_links[] = '<a style="font-size: 13px;" href="' . esc_url($area_link_url) . '">' . $area_term_name . '</a>';
-        }
-            $service_areas_html .= '<div style="border-top: 1px dashed #eee;">';
-            $service_areas_html .= '<span style="font-weight: bold; font-size: 14px;">Service Areas:</span> ';
-            $service_areas_html .= implode(', ', $area_links);
-            $service_areas_html .= '</div>';
-        }
-    }
-    $enabled_context_names = get_option('enabled_context_names');
-    $manager_html = '';
-    if (in_array('employee', $enabled_context_names)) {
-    $employee = get_manager_info_for_display($location_term_id);
-    if (!empty($employee)) {
-		$manager_given_name = $employee['given_name'];
-		$manager_family_name = $employee['family_name'];
-		$manager_work_phone = $employee['work_phone'];
-        $full_manager_name = trim(esc_html($manager_given_name) . ' ' . esc_html($manager_family_name));
-        if (!empty($full_manager_name)) {
-            $manager_html .= '<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #eee; color: #666;">';
-            $manager_html .= '<span style="font-weight: bold; color: #333;">' . $full_manager_name . '</span><br>';
-        }
-        if (!empty($manager_work_phone)) {
-            $manager_html .= '<a href="' . esc_url(format_telephone_for_link($manager_work_phone)) . '" style="color: #0073aa; text-decoration: none;">' . esc_html(format_telephone_for_display($manager_work_phone)) . '</a>';
-            }
-        $manager_html .= '</div>';
-    }
-    }
-    $output = '<div style="line-height: 1.4; font-family: Arial, sans-serif; font-size: 14px; color: #555; padding: 5px; background-color: #f9f9f9;">';
-    $output .= '<h4 style="margin: 0; font-size: 16px; color: #222;">' . $name . '</h4>';
-    if (!empty($address_lines)) $output .= '<p style="margin: 0;">' . implode('<br>', array_map('esc_html', $address_lines)) . '</p>';
-    if (!empty($phone)) $output .= '<p style="margin: 0;"><a href="' . esc_url(format_telephone_for_link($phone)) . '" style="color: #0073aa; text-decoration: none;">' . esc_html(format_telephone_for_display($phone)) . '</a></p>';
-    if (!empty($additional_phone)) $output .= '<p style="margin: 0;"><a href="' . esc_url(format_telephone_for_link($additional_phone)) . '" style="color: #0073aa; text-decoration: none;">' . esc_html(format_telephone_for_display($additional_phone)) . '</a></p>';
-    if (!empty($hours)) $output .= '<div style="font-size: 14px; color: #666; margin-top: 5px;">' . da_generate_opening_hours_html($hours) . '</div>';
-    $output .= $manager_html;
-    $output .= $service_areas_html;
-    if (!empty($link_url)) $output .= '<p style="margin: 5px 0;"><a href="' . esc_url($link_url) . '" style="color: #0073aa; text-decoration: none;">Visit Location Page</a></p>';
-    $output .= '</div>';
-    return $output;
-}
-function my_locations_list_shortcode($atts) {
-    $atts = shortcode_atts(['areas' => 'no', 'show_main' => 'yes', 'orderby' => 'name', 'order' => 'ASC', 'hide_empty' => false], $atts, 'my_locations_list');
-    $service_areas = $atts['areas']; 
-    $show_main = $atts['show_main'];
-    $company_info = get_option('company_info');
-    $location_taxonomy_slug = get_option('enabled_connector_contexts')['locations']['taxonomy'];
-    $main_term_id = $enabled['locations']['main_term'] ?? '';
-    $ignore_main_term = $enabled['locations']['ignore_main_term'] ?? '';
-    $output = '';
-    if ($show_main ==='yes'){
-        $company_name = esc_html($company_info['name']);
-        $company_phone = $company_info['phone_number'];
-        $company_address_lines = array_filter([
-            $company_info['street_address'],
-            $company_info['street_address_2'],
-        implode(' ', array_filter([$company_info['city'], $company_info['state'], $company_info['zipcode']]))]);
-        $output .= '<div style="grid-column: 1 / -1; margin-bottom: 10px; line-height: 1.4; font-family: Arial, sans-serif; font-size: 14px; color: #555; padding: 5px; background-color: #f9f9f9;">';
-        $output .= '<h4 style="margin: 0; font-size: 16px; color: #222;">' . $company_name . '</h4>';
-        if (!empty($company_address_lines)) {
-            $output .= '<p style="margin: 0;">' . implode('<br>', array_map('esc_html', $company_address_lines)) . '</p>';
-        }
-        if (!empty($corp_phone)) {
-            $output .= '<p style="margin: 0;"><a href="' . esc_url(format_telephone_for_link($company_phone)) . '" style="color: #0073aa; text-decoration: none;">' . esc_html(format_telephone_for_display($company_phone)) . '</a></p>';
-        }
-        $output .= '</div>';
-    }
-    $location_term_ids = get_terms(['taxonomy' => $location_taxonomy_slug, 'orderby' => $atts['orderby'], 'order' => $atts['order'], 'hide_empty' => $atts['hide_empty'], 'fields' => 'ids']);
-    if (empty($location_term_ids)) {
-        return '';
-    }
-    $cards_html = '';
-    foreach ($location_term_ids as $location_term_id) {
-    if (($ignore_main_term ==="1") && $main_term_id && $location_term_id === (int)$main_term_id) continue;
-        $cards_html .= render_location_term_card($location_term_id, $service_areas);
-    }
-    if(empty($cards_html)) {
-         return '';
-    }
-    $output .= '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0; list-style: none;">' . $cards_html . '</div>';
-    return $output;
-}
-add_shortcode('my_locations_list', 'my_locations_list_shortcode');
-
-
 function get_kml_config_map_name($config_id) {
     $company_info = get_option('company_info');
     $default_name = ($company_info['name'] ?? 'Company') . ' Map';
+
     $filters = get_option($config_id);
     if (empty($filters)) {
         return 'Invalid Map Configuration';
@@ -291,6 +102,7 @@ function get_kml_config_map_name($config_id) {
     foreach($filters as $term_ids) {
         $all_selected_term_ids = array_merge($all_selected_term_ids, $term_ids);
     }
+
     if (!empty($all_selected_term_ids) && count($all_selected_term_ids) <= 3) {
         $term_names = [];
         foreach ($all_selected_term_ids as $term_id) {
@@ -325,231 +137,384 @@ function da_generate_opening_hours_html($hours) {
     return $html;
 }
 
-function da_get_display_data($data, $source_type) {
-    $details = [];
-    if ($source_type === 'location') {
-        $entity_id = $data;
-        $details['name'] = get_term_meta($entity_id, 'location_name', true);
-        $details['link_url'] = get_term_meta($entity_id, 'location_link_url', true);
-        $details['latitude'] = get_term_meta($entity_id, 'latitude', true);
-        $details['longitude'] = get_term_meta($entity_id, 'longitude', true);
-        $details['phone'] = get_term_meta($entity_id, 'phone_number', true);
-        $details['hours'] = get_term_meta($entity_id, 'hours_of_operation', true);
-        $image_id = get_term_meta($entity_id, 'exterior_image', true);
-        $logo_id = get_term_meta($entity_id, 'location_logo', true);
-        $details['place_id'] = get_term_meta($entity_id, 'place_id', true);
-        $details['logo_url'] = '';
-        $details['image_url'] = '';
-        if (!empty($logo_id)){
-           $details['logo_url'] = get_image_for_display($logo_id);
+function my_osm_kml_map_shortcode($atts) {
+if ( isset( $atts['max-width'] ) ) {
+        $atts['max_width'] = $atts['max-width'];
+}
+$atts = shortcode_atts( array(
+        'width'     => '100%',
+        'height'    => '400px',
+        'max_width' => '600px',
+), $atts, 'my_osm_kml_map' );
+$map_width = $atts['width'];
+$map_height = $atts['height'];
+$map_max_width = $atts['max_width'];
+    $kml_source_data = '';
+    $is_kml_url = false;   
+$enabled = get_option('enabled_connector_contexts');
+$company_info = get_option('company_info');
+   $show_address_on_org = get_option('company_info')['show_address_on_org'];
+   if(($show_address_on_org) ==='0'){
+$default_term = $company_info['default_term'];
+}
+    $initial_center_lat = null;
+    $initial_center_lon = null;
+    $initial_map_zoom = 13; 
+    $locations_areas_status = get_option('locations_areas_status', 'none');
+    $current_post_id = get_the_ID();   
+    $location_term_id = da_get_location_term_or_default($current_post_id);
+    $custom_marker_url = '';
+    if (!empty($company_info['map_pin'])) {
+        $custom_marker_url = wp_get_attachment_url((int)$company_info['map_pin']);
+    }
+    if($location_term_id && ($location_term_id === $default_term)){
+        $initial_center_lat = get_term_meta($location_term_id, 'latitude', true);
+        $initial_center_lon = get_term_meta($location_term_id, 'longitude', true);
+         $kml_source_data = get_kml_download_url(); 
+         $initial_map_zoom = 15; 
+        $is_kml_url = true; 
+    }
+    elseif ($location_term_id && ($location_term_id !== $default_term)) {
+		$location_term_id = (int)$location_term_id;
+        $kml_source_data = get_term_meta($location_term_id, 'kml_content', true); 
+        $is_kml_url = false; 
+      	$initial_center_lat = get_term_meta($location_term_id, 'latitude', true);
+        $initial_center_lon = get_term_meta($location_term_id, 'longitude', true);
+        $initial_map_zoom = 15; 
+    } else {
+        $kml_source_data = get_kml_download_url(); 
+        $is_kml_url = true; 
+        $initial_center_lat = $company_info['latitude']; 
+        $initial_center_lon = $company_info['longitude'];
+		switch ($locations_areas_status) {
+            case 'none': 
+                $initial_map_zoom = 15;
+                break;
+            case 'multi_locations': 
+                $initial_map_zoom = 10;
+                break;
+            case 'multi_areas': 
+                $initial_map_zoom = 10;
+                break;
+            case 'both': 
+                $initial_map_zoom = 8;
+                break;
         }
-        if (!empty($image_id)){
-            $details['image_url'] =  get_image_for_display($image_id, 'medium');
+    }
+    if (empty($kml_source_data)) {
+		return '';
+	}
+	if((empty($initial_center_lat)) || (empty($initial_center_lon))){
+	   
+	}
+	$map_id = 'osm_map_' . str_replace('.', '_', uniqid()); 
+    wp_enqueue_style( 'leaflet-css', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', [], '1.9.4' );
+    wp_enqueue_script( 'leaflet-js', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', [], '1.9.4', true );
+    wp_enqueue_script( 'leaflet-omnivore', 'https://cdnjs.cloudflare.com/ajax/libs/leaflet-omnivore/0.3.4/leaflet-omnivore.min.js', ['leaflet-js'], '0.3.4', true );
+
+    $map_vars = [
+        'mapId'        => $map_id,
+        'kmlSource'    => $kml_source_data, 
+        'isKmlUrl'     => $is_kml_url,      
+        'initialLat'   => floatval($initial_center_lat), 
+        'initialLon'   => floatval($initial_center_lon), 
+        'initialZoom'  => $initial_map_zoom,
+        'customMarkerUrl' => $custom_marker_url
+    ];
+    wp_add_inline_script( 'leaflet-js', 'var ' . esc_js($map_id) . 'Vars = ' . json_encode($map_vars) . ';' );
+
+    ob_start();
+    ?>
+<div id="<?php echo $map_id; ?>" style="width: <?php echo $map_width; ?>; height: <?php echo $map_height; ?>; max-width: <?php echo $map_max_width; ?>; border: 0; outline: none;"></div><script>
+    document.addEventListener('DOMContentLoaded', function() {
+    var mapVars = window.<?php echo esc_js($map_id); ?>Vars;
+    var mapId = mapVars.mapId;
+    var kmlSource = mapVars.kmlSource;
+    var isKmlUrl = mapVars.isKmlUrl;
+    var initialLat = mapVars.initialLat;
+    var initialLon = mapVars.initialLon;
+    var initialZoom = mapVars.initialZoom;
+    var customMarkerUrl = mapVars.customMarkerUrl;
+    var map = L.map(mapId).setView([initialLat, initialLon], initialZoom);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+    
+    var bindPopups = function(layer) {
+        layer.eachLayer(function(subLayer) {
+            if (subLayer.feature && subLayer.feature.properties && subLayer.feature.properties.description) {
+                var popupOptions = {
+                    minWidth: 360,
+                    maxWidth: 400,
+                    maxHeight: 300
+                };
+                subLayer.bindPopup(subLayer.feature.properties.description, popupOptions);
+            }
+        });
+    };
+
+    var processKmlLayer = function(kmlLayer) {
+        kmlLayer.addTo(map);
+        bindPopups(kmlLayer);
+        var bounds = kmlLayer.getBounds();
+        var isValid = bounds.isValid();
+        if (isValid) {
+            map.fitBounds(bounds, { padding: [50, 50] });
+        }   
+    };
+
+    var customIcon;
+    if (customMarkerUrl) {
+        customIcon = L.icon({
+            iconUrl: customMarkerUrl,
+            iconRetinaUrl: customMarkerUrl, 
+            iconSize: [32, 32], 
+            iconAnchor: [16, 32], 
+            popupAnchor: [0, -32] 
+        });
+    } else {
+        customIcon = new L.Icon.Default(); 
+    }
+
+    var createCustomMarker = function(feature, latlng) {
+        if (feature.geometry && feature.geometry.type === 'Point') {
+            var marker = L.marker(latlng, { icon: customIcon });
+            return marker;
         }
-        $details['address_parts'] = da_get_address_data($entity_id);
-        $details['additional_phone'] = '';
-        if (get_term_meta($entity_id, 'second_phone', true) === '1') {
-            $details['additional_phone'] = get_term_meta($entity_id, 'additional_phone', true);
+        return undefined; 
+    };
+
+    var omnivoreOptions = {
+        pointToLayer: createCustomMarker
+    };
+
+    if (isKmlUrl) {
+        var geoJsonLayer = omnivore.kml(kmlSource);
+        geoJsonLayer.on('ready', function() {
+            var kmlFeaturesLayer = L.geoJson(this.toGeoJSON(), omnivoreOptions);
+            processKmlLayer(kmlFeaturesLayer);
+        }).on('error', function(error) {
+        });
+    } else {
+        try {
+            var parsedLayer = omnivore.kml.parse(kmlSource, omnivoreOptions);
+            processKmlLayer(parsedLayer);
+        } catch (e) {
         }
-        $post_id = get_term_meta($entity_id, 'location_post_id', true);
-        $details['description'] = '';  
-        if (!empty($post_id)){
-            $post_id = (int)$post_id;
-            $details['description'] = get_post_meta((int)$post_id, 'da_about_blurb', true) ??'';
-            if(empty($details['description'])){
-            $details['description'] = get_post_meta((int)$post_id, 'da_banner_description', true);
+    }
+});
+</script>
+
+    <?php
+    return ob_get_clean();
+}
+add_shortcode('my_osm_kml_map', 'my_osm_kml_map_shortcode');
+
+function generate_custom_kml_file(array $term_ids, $map_name = 'Custom Map') {
+    $status = get_option('locations_areas_status');
+    $company_info = get_option('company_info');
+    $location_term_id = $term_ids[0];
+	$location_term = get_term($location_term_id);
+	$location_term_name = $location_term->name;
+	$marker_icon_url ='';
+	$marker_icon_url = get_term_meta($location_term_id, 'map_pin', true);
+    if (!empty($company_info['map_pin'])) {
+        $marker_icon_url = $company_info['map_pin'];
+    }
+	if($location_term_name === $map_name){
+	        $kml = get_kml_doc_header($status, $map_name, $location_term_id);
+	        $lat = get_term_meta($location_term_id, 'latitude', true);
+            $lon = get_term_meta($location_term_id, 'longitude', true);
+	   $description = generate_kml_entity_description($location_term_id, 'location');
+        $kml .= "<Placemark><name>" . esc_html($company_info['name'] . ' - ' . $location_term_name) . "</name>";
+        $kml .= "<description>{$description}</description>";
+        if (!empty($marker_icon_url)) {
+            $kml .= "<styleUrl>{$marker_icon_url}</styleUrl>";
+        }
+        $kml .= "<Point><coordinates>{$lon},{$lat},0</coordinates></Point></Placemark>";
+            $kml .= '</Document></kml>';
+    return $kml;
+	}
+	else{
+	 $kml = get_kml_doc_header($status, $map_name, '');	
+	}
+        foreach ($term_ids as $term_id) {
+                   
+            $lat = get_term_meta($location_term->term_id, 'latitude', true);
+            $lon = get_term_meta($location_term->term_id, 'longitude', true);
+            if (!$lat || !$lon) continue;
+
+            if ($status === 'both') {
+                $description = generate_kml_entity_description($location_term->term_id, 'location');
+                $kml .= '<Folder><name>' . esc_html($location_term->name) . '</name>';
+                $kml .= "<Placemark><name>" . esc_html($company_info['name'] . ' - ' . $location_term->name) . "</name>";
+                $kml .= "<description>{$description}</description>";
+                if (!empty($marker_icon_url)) {
+                    $kml .= "<styleUrl>#company_marker_style</styleUrl>";
+                }
+                $kml .= "<Point><coordinates>{$lon},{$lat},0</coordinates></Point></Placemark>";
+                
+                $associated_area_ids = get_term_meta($location_term->term_id, 'associated_act_terms', true);
+                if (!empty($associated_area_ids) && is_array($associated_area_ids)) {
+                    $coordinate_pairs = [];
+                    foreach ($associated_area_ids as $area_id) {
+                        $area_lat = get_term_meta($area_id, 'latitude', true);
+                        $area_lon = get_term_meta($area_id, 'longitude', true);
+                        if ($area_lat && $area_lon) $coordinate_pairs[] = [$area_lon, $area_lat];
+                    }
+                    if (!empty($coordinate_pairs)) {
+                        $polygon_coords = create_geoshape_polygon_string_from_service_areas($coordinate_pairs);
+                        if (!empty($polygon_coords)) {
+                            $coords = explode(' ', $polygon_coords);
+                            $formatted_coords = [];
+                            for ($i = 0; $i < count($coords); $i += 2) {
+                                $formatted_coords[] = "{$coords[$i]},{$coords[$i + 1]},0";
+                            }
+                            $kml .= '<Placemark><name>' . esc_html($company_info['name'] . ' - ' . $location_term->name . ' Service Area') . '</name>';
+                            $kml .= "<styleUrl>#service_area_polygon_style</styleUrl>";
+                            $kml .= '<Polygon><outerBoundaryIs><LinearRing><coordinates>' . implode(' ', $formatted_coords) . '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>';
+                        }
+                    }
+                }
+                $kml .= '</Folder>';
+            } else {
+                $description = generate_kml_entity_description($location_term->term_id, 'location');
+                $kml .= "<Placemark><name>" . esc_html($company_info['name'] . ' - ' . $location_term->name) . "</name>";
+                $kml .= "<description>{$description}</description>";
+                if (!empty($marker_icon_url)) {
+                    $kml .= "<styleUrl>{$marker_icon_url}</styleUrl>";
+                }
+                $kml .= "<Point><coordinates>{$lon},{$lat},0</coordinates></Point></Placemark>";
             }
         }
-    } else {
-        $info = $data;
-        $details['name'] = $info['name'];
-        $details['link_url'] = home_url('/');
-        $details['phone'] = $info['phone_number'];
-        $details['hours'] = $info['hours_of_operation'];
-        $details['place_id'] = $info['place_id'];
-        $image_id = $info['exterior_image'];
-        $logo_id = $info['company_logo'];
-        $details['description'] = $info['company_description'];
-        $details['address_parts'] = da_get_address_data(); 
-        $details['logo_url'] = '';
-        $details['image_url'] = '';
-        if (!empty($logo_id)){
-           $details['logo_url'] = get_image_for_display($logo_id);
-        }
-        if (!empty($image_id)){
-            $details['image_url'] =  get_image_for_display($image_id, 'medium');
-        }
-        $details['additional_phone'] = '';
-        if ($info['second_phone'] === "1") {
-           $details['additional_phone'] = $info['additional_phone'];
-        }
-    }
-
-    return array_filter($details);
+    
+    $kml .= '</Document></kml>';
+    return $kml;
 }
-function generate_kml_entity_description($data, $source_type = 'location') {
-    $company_name = get_option('company_info')['name'];
-    $details = da_get_display_data($data, $source_type);
-    if ($source_type === 'location') {
-        $details = da_get_display_data($data, $source_type);
-        $location_term = get_term($data);
-        $location_area_name = $location_term->name; 
-        $location_office_name = $details['name'];
-        $enabled_context_names = get_option('enabled_context_names');
-        if (in_array('employee', $enabled_context_names)) {
-           $employee = get_manager_info_for_display($data);
-            if (!empty($employee)){
-                $manager_given_name   = $employee['given_name'];
-                $manager_family_name  = $employee['family_name'];
-                $manager_work_email   = $employee['work_email'];
-                $manager_work_phone   = $employee['work_phone'];
-                $manager_job_title    = $employee['job_title'];
-                $manager_portrait_url  = $employee['portrait_url'];
-             }
-        }
-    } else {
-        $title = $company_name;
-    }
-    $address = $details['address_parts'];
-    $address_line_1 = trim(implode(' ', array_filter([$address['street_address'], $address['street_address_2']])));
-    $address_line_2 = trim(implode(', ', array_filter([$address['city'], $address['state'], $address['zipcode'], $address['addy_country']])));
-    $full_html = '<div style="max-width: 360px;">';
-    $full_html .= '<table class="dibraco-kml-infowindow" border="0" cellpadding="5" cellspacing="0" style="width: 100%; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.3;">';
-    $full_html .= '<tr><td colspan="2" style="padding-top: 10px; padding-bottom:10px; border-bottom:1px solid #eee;">';
-    $full_html .= '<table border="0" cellpadding="0" cellspacing="0"><tr>';
-    if ($details['logo_url']) {
-        $full_html .= '<td valign="middle"><img src="' . esc_url($details['logo_url']) . '" alt="Logo" style="max-width:40px; height:auto; vertical-align:middle;"></td>';
-    }
-    $full_html .= '<td valign="middle" style="padding-left:10px;"><b style="font-size:14px;">' . $title . '</b></td>';
-    $full_html .= '</tr></table></td></tr><tr><td width="35%" valign="top" style="padding-right: 5px; padding-top:5px;">';
-    $main_info_left = '';
-    if ((!empty($address_line_1)) || (!empty($address_line_2))) {
-        $main_info_left .= '<div style="font-weight:bold; text-decoration:underline; margin-bottom:5px;">Our Address</div>';
-        if (!empty($address_line_1)) {
-            $main_info_left .= esc_html($address_line_1) . '<br>';
-        }
-        if (!empty($address_line_2)) {
-            $main_info_left .= esc_html($address_line_2);
-        }
-        $main_info_left .= '<br><br>';
-    }
-    if (!empty($details['phone'])) {
-        $main_info_left .= '<b>Phone:</b><br><a href="' . esc_url(format_telephone_for_link($details['phone'])) . '">' . esc_html(format_telephone_for_display($details['phone'])) . '</a>';
-    }
-    if (!empty($details['additional_phone'])) {
-        $main_info_left .= '<b>Alt. Phone:</b><br><a href="' . esc_url(format_telephone_for_link($details['additional_phone'])) . '">' . esc_html(format_telephone_for_display($details['additional_phone'])) . '</a>';
-    }
-    $main_info_left .= da_generate_opening_hours_html($details['hours']);
-    $full_html .= $main_info_left;
-    $full_html .= '</td><td width="65%" valign="top" style="padding-left: 5px; padding-top:15px;">';
-    $main_info_right = '';
-    if (!empty($details['image_url'])) {
-$main_info_right = '<img src="' . esc_url($details['image_url']) . '" alt="Exterior" style="max-width: 234px; width: 100%; height: auto; display: block; border: 1px solid #ccc; padding: 3px;">';
-    }
-    $full_html .= $main_info_right;
-    $full_html .= '</td></tr>';
-    $link_url = $details['link_url'];
-    if (!empty($link_url)) {
-        $full_html .= '<tr>';
-        $full_html .= '<td colspan="2" style="text-align: center; padding: 5px 0; border-top: 1px solid #eee; color:black; font-size:12px;">';
-        $full_html .= ($source_type === 'location') ? '<a href="' . esc_url($link_url) . '">Visit Location Page</a>' : '<a href="' . esc_url($link_url) . '">Visit Our Website</a>';
-        $full_html .= '</td></tr>';
-    }
-     $place_id = $details['place_id'];
-    if (!empty($place_id)) {
-        $Maps_url = 'https://www.google.com/maps/place/?q=place_id:' . urlencode($place_id);
-        $full_html .= '<tr><td colspan="2" style="text-align: center; padding: 5px 0; border-top: 1px solid #eee; font-size:12px;">';
-        $full_html .= '<a href="' . esc_url($Maps_url) . '" target="_blank" rel="noopener noreferrer">View on Google Maps & See Reviews</a>';
-        $full_html .= '</td></tr>';
 
-    }
-    if (!empty($details['description'])) {
-        $description = esc_html($details['description']);
-        $description_words = explode(' ', $description);
-        if (count($description_words) > 40) {
-            $description = implode(' ', array_slice($description_words, 0, 40)) . '...';
-        }
-        $full_html .= '<tr><td colspan="2" style="border-top:1px solid #eee; padding-top:10px;">';
-        $full_html .= '<div style="margin-bottom:10px; font-size:12px;">' . wpautop($description) . ' <a href="' . esc_url($details['link_url']) . '" style="font-size:12px; color:#0073e6; text-decoration:none;">Read more</a></div>';
-        $full_html .= '</td></tr>';
-    }
-    if (!empty($manager_given_name) || !empty($manager_portrait_url)) {
-        $full_html .= '<tr>';
-        $full_html .= '<td colspan="2" style="border-top:1px solid #eee; padding-top:5px;">';
-        $full_html .= '<div style="font-weight:bold; text-decoration:underline; margin-bottom:5px;">Your Location Contact</div>';
-        $full_html .= '<table border="0" cellpadding="0" cellspacing="0"><tr>';
-        $full_html .= '<td width="40%" valign="top" style="max-width:180px; padding-right: 5px;">';
-        $portrait_cell = '';
-        if (!empty($manager_portrait_url)) {
-            $portrait_cell = '<img src="' . esc_url($manager_portrait_url) . '" alt="Market Manager" max-width:"234px" width="100%" style="height:auto; border:1px solid #ccc; padding:2px;">';
-        }
-        $full_html .= $portrait_cell;
-        $full_html .= '</td><td width="57%" valign="top" style="max-width: 180px; padding-right:5px; padding-left:5px;">';
-        $details_cell = '';
-        if (!empty($manager_given_name)) {
-            $full_name = esc_html($manager_given_name);
-            if (!empty($manager_family_name)) $full_name .= ' ' . esc_html($manager_family_name);
-            $details_cell .= '<b>' . $full_name . '</b><br>';
-        }
-        if (!empty($manager_job_title)) $details_cell .= '<i>' . esc_html($manager_job_title) . '</i><br><br>';
-        if (!empty($manager_work_phone)) $details_cell .= '<b>Phone:</b> ' . esc_html(format_telephone_for_display($manager_work_phone)) . '<br>';
-        if (!empty($manager_work_email)) $details_cell .= '<b>Email:</b> <a href="mailto:' . esc_attr($manager_work_email) . '">' . esc_html($manager_work_email) . '</a>';
-        $full_html .= $details_cell;
-        $full_html .= '</td></tr></table>';
-
-        if (!empty($manager_work_phone) && !empty($manager_given_name)) {
-            $call_link = format_telephone_for_link($manager_work_phone);
-            $full_html .= '<a href="' . esc_url($call_link) . '" style="background-color:#606770; color:white; padding:5px 5px; text-align:center; text-decoration:none; display:inline-block; border-radius:4px;">Call ' . esc_html($manager_given_name) . '</a>';
-        }
-    $full_html .= '</td></tr>';
-
-    }
-
-    $full_html .= '</table></div>';
-
-    return "<![CDATA[{$full_html}]]>";
+function get_kml_download_url() {
+    return add_query_arg(['download_kml' => 'true'], home_url('/'));
 }
-function get_image_for_display($image_id, $size ='medium'){
-(int)$image_id;
- return wp_get_attachment_image_url($image_id, $size);
 
+function dibraco_serve_kml_file() {
+    header('Content-Type: application/vnd.google-earth.kml+xml');
+    header('Content-Disposition: attachment; filename="locations.kml"');
+    echo generate_master_kml_file();
+    exit();
 }
-function get_manager_info_for_display($location_term_id) {
-    $manager_id = get_term_meta($location_term_id, 'location_manager', true);
-    if (empty($manager_id)) {
+
+
+function dibraco_serve_geo_sitemap() {
+    header('Content-Type: application/xml; charset=utf-8');
+    $kml_url = get_kml_download_url();
+    $lastmod_date = date('c');
+
+    $xml = '<?xml version="1.0" encoding="UTF-8"?>';
+    $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:geo="http://www.google.com/geo/sitemap/1.0">';
+    $xml .=   '<url>';
+    $xml .=     '<loc>' . $kml_url . '</loc>';
+    $xml .=     '<lastmod>' . $lastmod_date . '</lastmod>';
+    $xml .=   '</url>';
+    $xml .= '</urlset>';
+
+    echo $xml;
+    exit();
+}
+function handle_kml_generation_request() {
+    if (!isset($_POST['kml_filter_nonce']) || !wp_verify_nonce($_POST['kml_filter_nonce'], 'generate_filtered_kml_action')) {
+        wp_die('Security check failed.');
+    }
+    $filters = $_POST['filters'] ?? [];
+    if (empty(array_filter($filters))) {
+        wp_redirect(admin_url('admin.php?page=dibraco-relationships-kml-generator&error=no_filters'));
+        exit();
+    }
+    $sanitized_filters = [];
+    foreach ($filters as $taxonomy => $term_ids) {
+        if (!empty($term_ids)) {
+            $sanitized_filters[sanitize_key($taxonomy)] = array_map('intval', $term_ids);
+        }
+    }
+    $config_id = 'kml_config_' . wp_generate_password(12, false);
+    update_option($config_id, $sanitized_filters, 'no');
+
+    $saved_maps = get_option('dibraco_saved_kml_maps', []);
+    $saved_maps[] = $config_id;
+    update_option('dibraco_saved_kml_maps', array_unique($saved_maps), 'no');
+
+    $redirect_url = admin_url('admin.php?page=dibraco-relationships-kml-generator&config_id=' . $config_id . '&status=created');
+    wp_redirect($redirect_url);
+    exit();
+}
+add_action('admin_post_generate_filtered_kml', 'handle_kml_generation_request');
+function handle_kml_config_delete() {
+    if (!isset($_GET['config_id']) || !isset($_GET['_wpnonce']) || !wp_verify_nonce($_GET['_wpnonce'], 'delete_kml_config_' . $_GET['config_id'])) {
+        wp_die('Security check failed.');
+    }
+
+    $config_id = $_GET['config_id'];
+    delete_option($config_id);
+    $saved_maps = get_option('dibraco_saved_kml_maps', []);
+    $saved_maps = array_diff($saved_maps, [$config_id]);
+    update_option('dibraco_saved_kml_maps', $saved_maps, 'no');
+    
+    $redirect_url = admin_url('admin.php?page=dibraco-relationships-kml-generator&status=deleted');
+    wp_redirect($redirect_url);
+    exit();
+}
+add_action('admin_action_delete_kml_config', 'handle_kml_config_delete');
+
+
+function get_filtered_location_ids_from_config($config_id) {
+    $filters = get_option($config_id);
+    if (empty($filters) || !is_array($filters)) {
         return [];
     }
-    $employee_data = get_post_meta($manager_id, 'employee_data', true);
-    $manager_portrait_id = get_post_meta($manager_id, 'dibraco_portrait_1', true);
-    $manager_portrait_url = '';
-    if (!empty($manager_portrait_id)) {
-        $manager_portrait_url = get_image_for_display((int)$manager_portrait_id, 'medium');
+
+    $enabled = get_option('enabled_connector_contexts');
+    $location_post_type = $enabled['locations']['post_type'];
+    $location_taxonomy_slug = $enabled['locations']['taxonomy'];
+
+    $tax_query = ['relation' => 'AND'];
+    foreach ($filters as $taxonomy => $term_ids) {
+        if (!empty($term_ids)) {
+            $tax_query[] = [
+                'taxonomy' => sanitize_key($taxonomy),
+                'field'    => 'term_id',
+                'terms'    => array_map('intval', $term_ids),
+            ];
+        }
     }
-    return [
-        'given_name'      => $employee_data['given_name'],
-        'family_name'     => $employee_data['family_name'],
-        'work_email'      => $employee_data['work_email'],
-        'work_phone'      => $employee_data['work_phone'],
-        'job_title'       => $employee_data['job_title'], 
-        'portrait_url'    => $manager_portrait_url,
-    ];
+
+    if (count($tax_query) > 1) {
+        $args = ['post_type' => $location_post_type, 'posts_per_page' => -1, 'tax_query' => $tax_query, 'fields' => 'ids'];
+        $matching_post_ids = get_posts($args);
+        if (!empty($matching_post_ids)) {
+            $term_ids = wp_get_object_terms($matching_post_ids, $location_taxonomy_slug, ['fields' => 'ids']);
+          
+        }
+    }
+
+    return [];
 }
+
+
+
+
 function get_kml_doc_header($status, $map_name, $location_term_id = '') {
     $company_info = get_option('company_info');
-    $stylesheet_url = esc_url(add_query_arg(['dibraco_kml_xsl' => 'true'], home_url('/')));
-    $kml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
-    $kml .= '<?xml-stylesheet type="text/xsl" href="' . $stylesheet_url . '"?>' . "\n";
-    $kml .= '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
+	$kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="https://www.opengis.net/kml/2.2"><Document>';
     $kml .= '<name>' . esc_html($map_name) . '</name>';
     $company_style_id = 'company_marker_style';
     $marker_icon_url = '';
     if (!empty($company_info['map_pin'])) {
-        if (!empty($company_map_pin_id)) {
-            $marker_icon_url = get_image_for_display($company_map_pin_id, 'small');
+        $marker_icon_url = $company_info['map_pin'];
+        if (is_numeric($marker_icon_url)) {
+            $marker_icon_url = wp_get_attachment_url($company_map_pin_id);
         }
     }
     if (!empty($marker_icon_url)) {
-        $kml .= "<Style id=\"{$company_style_id}\"><IconStyle><Icon><href>" . esc_url($marker_icon_url) . "</href></Icon></IconStyle></Style>";
+        $kml .= "<Style id=\"{$company_style_id}\"><IconStyle><Icon><href>" . $marker_icon_url . "</href></Icon></IconStyle></Style>";
     }
     if ($status ==='both' || $status ==='multi_areas'){
     $kml .= "<Style id=\"service_area_polygon_style\"><LineStyle><color>ff0000ff</color><width>3</width></LineStyle><PolyStyle><color>330000ff</color></PolyStyle></Style>";
@@ -567,44 +532,43 @@ function get_kml_doc_header($status, $map_name, $location_term_id = '') {
 	}
     return $kml;
 }
-    function get_location_kml_for_map($location_term_id, $company_name, $marker_icon_url =''){
-                $lat = get_term_meta($location_term_id, 'latitude', true);
-               if (!$lat) {return null;}
-                $lon = get_term_meta($location_term_id, 'longitude', true);
-                $location_name = get_term($location_term_id)->name;
-                $description = generate_kml_entity_description($location_term_id, 'location');
-                $kml = "<Placemark><name>" .  $company_name  . ' - ' . $location_name . "</name>";
-                $kml .= "<description>{$description}</description>";
-                if (!empty($marker_icon_url)) {
-                    $kml .= "<styleUrl>#company_marker_style</styleUrl>";
-                }
-                $kml .= "<Point><coordinates>{$lon},{$lat},0</coordinates></Point></Placemark>";
-                return $kml;
-                }
+
 
 function generate_master_kml_file() {
     $status = get_option('locations_areas_status');
     $enabled = get_option('enabled_connector_contexts');
     $company_info = get_option('company_info');
-    $main_term_id = $enabled['locations']['main_term'];
-    $ignore_main_term = $enabled['locations']['ignore_main_term'];
-    $company_name = $company_info['name'];
-    $kml = get_kml_doc_header($status, $company_name ?? 'Company Map');
+    $main_term_id = $enabled['locations']['main_term'] ?? null;
+    $ignore_main_term = !empty($enabled['locations']['ignore_main_term']) && $enabled['locations']['ignore_main_term'] === '1';
+    $kml = get_kml_doc_header($status, $company_info['name'] ?? 'Company Map');
+    
     $marker_icon_url = '';
-    $company_map_pin_id = $company_info['map_pin'];
     if (!empty($company_info['map_pin'])) {
-           $marker_icon_url = get_image_for_display($company_map_pin_id, 'small');
+        $company_map_pin_id = (int) $company_info['map_pin'];
+        if ($company_map_pin_id > 0) {
+            $marker_icon_url = wp_get_attachment_url($company_map_pin_id);
+        }
     }
-   switch ($status) {
+        switch ($status) {
         case 'multi_locations':
-             $location_tax = $enabled['locations']['taxonomy'];
+            $location_tax = $enabled['locations']['taxonomy'];
             $location_terms = get_terms(['taxonomy' => $location_tax, 'hide_empty' => false]);
-             foreach ($location_terms as $location_term) {
-               $location_term_id =  $location_term->term_id;
-                   if ($ignore_main_term && $main_term_id && $location_term_id == $main_term_id) {continue;}
-                 $kml .=  get_location_kml_for_map($location_term_id, $company_name, $marker_icon_url);
-             }
+            foreach ($location_terms as $location_term) {
+                if ($ignore_main_term && $main_term_id && $location_term->term_id == $main_term_id) continue;
+                $lat = get_term_meta($location_term->term_id, 'latitude', true);
+                $lon = get_term_meta($location_term->term_id, 'longitude', true);
+                if (!$lat || !$lon) continue;
+
+                $description = generate_kml_entity_description($location_term->term_id, 'location');
+                $kml .= "<Placemark><name>" . esc_html($company_info['name'] . ' - ' . $location_term->name) . "</name>";
+                $kml .= "<description>{$description}</description>";
+                if (!empty($marker_icon_url)) {
+                    $kml .= "<styleUrl>#company_marker_style</styleUrl>";
+                }
+                $kml .= "<Point><coordinates>{$lon},{$lat},0</coordinates></Point></Placemark>";
+            }
             break;
+
         case 'multi_areas':
             $service_tax = $enabled['service_areas']['taxonomy'];
             $service_area_terms = get_terms(['taxonomy' => $service_tax, 'hide_empty' => true]);
@@ -618,265 +582,37 @@ function generate_master_kml_file() {
                 $polygon_coords = create_geoshape_polygon_string_from_service_areas($coordinate_pairs);
                 if (!empty($polygon_coords)) {
                     $coords = explode(' ', $polygon_coords);
-                    $kml .= get_polygon_coords_for_kml($coords, $company_name, $location_term);
-
+                    $formatted_coords = [];
+                    for ($i = 0; $i < count($coords); $i += 2) {
+                        $formatted_coords[] = "{$coords[$i]},{$coords[$i + 1]},0";
+                    }
+                    $kml .= '<Placemark><name>' . esc_html($company_info['name'] . ' - Total Service Area') . '</name>';
+                    $kml .= "<styleUrl>#service_area_polygon_style</styleUrl>";
+                    $kml .= '<Polygon><outerBoundaryIs><LinearRing><coordinates>';
+                    $kml .= implode(' ', $formatted_coords);
+                    $kml .= '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>';
                 }
             }
             break;
 
         case 'both':
             $location_tax = $enabled['locations']['taxonomy'];
-            $location_terms = get_terms(['taxonomy' => $location_tax, 'hide_empty' => false]);
-           
-             foreach ($location_terms as $location_term) {
-               $location_term_id =  $location_term->term_id;
-                   if ($ignore_main_term && $main_term_id && $location_term_id == $main_term_id) {continue;}
-                 $kml .=  get_location_kml_for_map($location_term_id, $company_name, $marker_icon_url);
-                   $associated_area_ids = get_term_meta($location_term->term_id, 'associated_act_terms', true);
-                if (!empty($associated_area_ids) && is_array($associated_area_ids)) {
-                    $coordinate_pairs = [];
-                    foreach ($associated_area_ids as $area_id) {
-                        $area_lat = get_term_meta($area_id, 'latitude', true);
-                        $area_lon = get_term_meta($area_id, 'longitude', true);
-                        if ($area_lat && $area_lon) $coordinate_pairs[] = [$area_lon, $area_lat];
-                    }
-                    if (!empty($coordinate_pairs)) {
-                        $polygon_coords = create_geoshape_polygon_string_from_service_areas($coordinate_pairs);
-                        if (!empty($polygon_coords)) {
-                            $coords = explode(' ', $polygon_coords);
-                           $kml .= get_polygon_coords_for_kml($coords, $company_name, $location_term);
-                            
-                        }
-                    }
-                }
-                //$kml .= '</Folder>';
-            }
-            break;
-    }
+            $all_location_terms = get_terms(['taxonomy' => $location_tax, 'hide_empty' => false]);
+            foreach ($all_location_terms as $location_term) {
+                if ($ignore_main_term && $main_term_id && $location_term->term_id == $main_term_id) continue;
+                $lat = get_term_meta($location_term->term_id, 'latitude', true);
+                $lon = get_term_meta($location_term->term_id, 'longitude', true);
+                if (!$lat || !$lon) continue;
 
-    $kml .= '</Document></kml>';
-    return $kml;
-}
-function get_polygon_coords_for_kml($coords, $company_name, $location_term =[]){
-$formatted_coords = [];
-for ($i = 0; $i < count($coords); $i += 2) {
-$formatted_coords[] = "{$coords[$i]},{$coords[$i + 1]},0";
-    }
-$location_term_name = 'total';
-if (!empty($location_term)){
-$location_term_name = $location_term->name;
-}
-$kml = '<Placemark><name>' . $company_name . ' - ' . $location_term_name . ' Service Area' . '</name>';
-$kml .= "<styleUrl>#service_area_polygon_style</styleUrl>";
-$kml .= '<Polygon><outerBoundaryIs><LinearRing><coordinates>' . implode(' ', $formatted_coords) . '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>';
-   return $kml;                   
-}
-
-function my_osm_kml_map_shortcode($atts) {
-    if ( isset( $atts['max-width'] ) ) {
-        $atts['max_width'] = $atts['max-width'];
-    }
-    $atts = shortcode_atts( array(
-        'width'       => '100%',
-        'height'      => '400px',
-        'max_width'   => '600px',
-        'zoom'        => null, 
-    ), $atts, 'my_osm_kml_map' );
-
-    $map_width = $atts['width'];
-    $map_height = $atts['height'];
-    $map_max_width = $atts['max_width'];
-    $shortcode_zoom = $atts['zoom'];
-    $kml_source_data = '';
-    $is_kml_url = false;
-    $initial_center_lat = null;
-    $initial_center_lon = null;
-    $initial_map_zoom = 13; 
-    $custom_marker_url = '';
-    $status = get_option('locations_areas_status');
-    $current_post_id = get_the_ID();
-    $location_term_id = da_get_location_term_or_default($current_post_id);
-    $company_info = get_option('company_info');
-    if (!empty($company_info['map_pin'])) {
-        $custom_marker_url = get_image_for_display($company_info['map_pin']);
-    }
-    if ($location_term_id) {
-        $location_term_id = (int)$location_term_id;
-        $kml_source_data = get_term_meta($location_term_id, 'kml_content', true);
-        $is_kml_url = false;
-        $initial_center_lat = get_term_meta($location_term_id, 'latitude', true);
-        $initial_center_lon = get_term_meta($location_term_id, 'longitude', true);
-        $initial_map_zoom = 15;
-    } else {
-        $kml_source_data = get_kml_download_url();
-        $is_kml_url = true;
-        $initial_center_lat = $company_info['latitude'];
-        $initial_center_lon = $company_info['longitude'];
-                switch ($status) {
-            case 'none':
-                $initial_map_zoom = 15;
-                break;
-            case 'multi_locations':
-            case 'multi_areas':
-                $initial_map_zoom = 10;
-                break;
-            case 'both':
-                $initial_map_zoom = 8;
-                break;
-        }
-    }
-    if (!is_null($shortcode_zoom) && is_numeric($shortcode_zoom)) {
-        $initial_map_zoom = (int)$shortcode_zoom;
-    }
-    if (empty($kml_source_data) || empty($initial_center_lat) || empty($initial_center_lon)) {
-        return '';
-    }
-    $map_id = 'osm_map_' . str_replace('.', '_', uniqid());
-    wp_enqueue_style( 'leaflet-css', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', [], '1.9.4' );
-    wp_enqueue_script( 'leaflet-js', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', [], '1.9.4', true );
-    wp_enqueue_script( 'leaflet-omnivore', 'https://cdnjs.cloudflare.com/ajax/libs/leaflet-omnivore/0.3.4/leaflet-omnivore.min.js', ['leaflet-js'], '0.3.4', true );
-
-    $map_vars = [
-        'mapId'             => $map_id,
-        'kmlSource'         => $kml_source_data,
-        'isKmlUrl'          => $is_kml_url,
-        'initialLat'        => floatval($initial_center_lat),
-        'initialLon'        => floatval($initial_center_lon),
-        'initialZoom'       => $initial_map_zoom,
-        'shortcodeZoom'     => $shortcode_zoom, // Pass the shortcode zoom to JS
-        'customMarkerUrl'   => $custom_marker_url
-    ];
-    wp_add_inline_script( 'leaflet-js', 'var ' . esc_js($map_id) . 'Vars = ' . json_encode($map_vars) . ';' );
-    ob_start();
-    ?>
-    <div id="<?php echo esc_attr($map_id); ?>" style="width: <?php echo esc_attr($map_width); ?>; height: <?php echo esc_attr($map_height); ?>; max-width: <?php echo esc_attr($map_max_width); ?>; border: 0; outline: none;"></div>
-    
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var mapVars = window.<?php echo esc_js($map_id); ?>Vars;
-        var mapId = mapVars.mapId;
-        var kmlSource = mapVars.kmlSource;
-        var isKmlUrl = mapVars.isKmlUrl;
-        var initialLat = mapVars.initialLat;
-        var initialLon = mapVars.initialLon;
-        var initialZoom = mapVars.initialZoom;
-        var shortcodeZoom = mapVars.shortcodeZoom;
-        var customMarkerUrl = mapVars.customMarkerUrl;
-        function initializeLeafletMap() {
-            var map = L.map(mapId).setView([initialLat, initialLon], initialZoom);
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
-            var bindPopups = function(layer) {
-                layer.eachLayer(function(subLayer) {
-                    if (subLayer.feature && subLayer.feature.properties && subLayer.feature.properties.description) {
-                        var popupOptions = { minWidth: 360, maxWidth: 400, maxHeight: 300 };
-                        subLayer.bindPopup(subLayer.feature.properties.description, popupOptions);
-                    }
-                });
-            };
-            var processKmlLayer = function(kmlLayer) {
-                kmlLayer.addTo(map);
-                bindPopups(kmlLayer);
-                var bounds = kmlLayer.getBounds();
-                                if (bounds.isValid() && shortcodeZoom === null) {
-                    map.fitBounds(bounds, { padding: [50, 50] });
-                }
-            };
-            var customIcon;
-            if (customMarkerUrl) {
-                customIcon = L.icon({
-                    iconUrl: customMarkerUrl,
-                    iconRetinaUrl: customMarkerUrl,
-                    iconSize: [32, 32],
-                    iconAnchor: [16, 32],
-                    popupAnchor: [0, -32]
-                });
-            } else {
-                customIcon = new L.Icon.Default();
-            }
-            var createCustomMarker = function(feature, latlng) {
-                if (feature.geometry && feature.geometry.type === 'Point') {
-                    return L.marker(latlng, { icon: customIcon });
-                }
-                return undefined;
-            };
-            var omnivoreOptions = {
-                pointToLayer: createCustomMarker
-            };
-            if (typeof omnivore !== 'undefined') {
-                if (isKmlUrl) {
-                    var geoJsonLayer = omnivore.kml(kmlSource);
-                    geoJsonLayer.on('ready', function() {
-                        var kmlFeaturesLayer = L.geoJson(this.toGeoJSON(), omnivoreOptions);
-                        processKmlLayer(kmlFeaturesLayer);
-                    }).on('error', function(error) {
-                    });
-                } else {
-                    try {
-                        var parsedLayer = omnivore.kml.parse(kmlSource, omnivoreOptions);
-                        processKmlLayer(parsedLayer);
-                    } catch (e) {
-                        console.error("Error parsing inline KML:", e);
-                    }
-                }
-            }
-        }
-        var mapElement = document.getElementById(mapId);
-        var observerOptions = {
-            root: null,
-            rootMargin: '0px',
-            threshold: 0.1
-        };
-        var mapObserver = new IntersectionObserver(function(entries, observer) {
-            entries.forEach(function(entry) {
-                if (entry.isIntersecting) {
-                    initializeLeafletMap();
-                    observer.unobserve(entry.target); // Stop observing once loaded
-                }
-            });
-        }, observerOptions);
-
-        if (mapElement) {
-            mapObserver.observe(mapElement);
-        }
-    });
-    </script>
-    <?php
-    return ob_get_clean();
-}
-add_shortcode('my_osm_kml_map', 'my_osm_kml_map_shortcode');
-function generate_custom_kml_file($term_ids, $map_name = 'Custom Map') {
-    $status = get_option('locations_areas_status');
-    $company_info = get_option('company_info');
-    $location_term_id = $term_ids[0];
-	$location_term = get_term($location_term_id);
-	$location_term_name = $location_term->name;
-	$company_name = $company_info['name'];
-	if($location_term_name === $map_name){
-	  $kml = get_kml_doc_header($status, $map_name, $location_term_id);
-	}
-	else{
-	 $kml = get_kml_doc_header($status, $map_name, '');	
-	}
-    $marker_icon_url = '';
-    if (!empty($company_info['map_pin'])) {
-        $marker_icon_url = wp_get_attachment_url($company_info['map_pin']);
-    }
-        if ($status === 'both') {
-             foreach ($term_ids as $term_id) {
-                $latitude = get_term_meta($term_id, 'latitude', true);
-                if (empty($latitude)){continue;}
-                $longitude = get_term_meta($term_id, 'longitude', true);
-                $description = generate_kml_entity_description($term_id, 'location');
+                $description = generate_kml_entity_description($location_term->term_id, 'location');
                 $kml .= '<Folder><name>' . esc_html($location_term->name) . '</name>';
-                $kml .= "<Placemark><name>" . esc_html($company_name . ' - ' . $location_term->name) . "</name>";
+                $kml .= "<Placemark><name>" . esc_html($company_info['name'] . ' - ' . $location_term->name) . "</name>";
                 $kml .= "<description>{$description}</description>";
                 if (!empty($marker_icon_url)) {
                     $kml .= "<styleUrl>#company_marker_style</styleUrl>";
                 }
-                $kml .= "<Point><coordinates>{$longitude},{$latitude},0</coordinates></Point></Placemark>";
+                $kml .= "<Point><coordinates>{$lon},{$lat},0</coordinates></Point></Placemark>";
+                
                 $associated_area_ids = get_term_meta($location_term->term_id, 'associated_act_terms', true);
                 if (!empty($associated_area_ids) && is_array($associated_area_ids)) {
                     $coordinate_pairs = [];
@@ -889,129 +625,392 @@ function generate_custom_kml_file($term_ids, $map_name = 'Custom Map') {
                         $polygon_coords = create_geoshape_polygon_string_from_service_areas($coordinate_pairs);
                         if (!empty($polygon_coords)) {
                             $coords = explode(' ', $polygon_coords);
-                               $kml .= get_polygon_coords_for_kml($coords, $company_name, $location_term);
+                            $formatted_coords = [];
+                            for ($i = 0; $i < count($coords); $i += 2) {
+                                $formatted_coords[] = "{$coords[$i]},{$coords[$i + 1]},0";
                             }
+                            $kml .= '<Placemark><name>' . esc_html($company_info['name'] . ' - ' . $location_term->name . ' Service Area') . '</name>';
+                            $kml .= "<styleUrl>#service_area_polygon_style</styleUrl>";
+                            $kml .= '<Polygon><outerBoundaryIs><LinearRing><coordinates>' . implode(' ', $formatted_coords) . '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>';
+                        }
                     }
                 }
                 $kml .= '</Folder>';
-            } 
-        }  else {
-                $description = generate_kml_entity_description($location_term->term_id, 'location');
-                $kml .= "<Placemark><name>" . esc_html($company_info['name'] . ' - ' . $location_term->name) . "</name>";
-                $kml .= "<description>{$description}</description>";
-                if (!empty($marker_icon_url)) {
-                    $kml .= "<styleUrl>#company_marker_style</styleUrl>";
-                }
-                $kml .= "<Point><coordinates>{$lon},{$lat},0</coordinates></Point></Placemark>";
             }
+            break;
+    }
 
     $kml .= '</Document></kml>';
     return $kml;
 }
+function filtered_locations_list_shortcode($atts) {
+    $enabled_context = get_option('enabled_connector_contexts')['locations'];
+    $location_taxonomy_slug =$enabled_context['taxonomy'];
+    $location_post_type = $enabled_context['post_type'];
+    $location_term_ids = [];
+    $atts = $atts ?? [];
+    if (!empty($atts['config_id'])) {
+        $location_term_ids = get_filtered_location_ids_from_config(sanitize_key($atts['config_id']));
+    } 
+    else if (!empty($atts) && is_array($atts)) {
+        $filters = [];
+        $valid_taxonomies = get_object_taxonomies($location_post_type, 'objects');
+        foreach ($atts as $taxonomy => $terms) {
+            if (isset($valid_taxonomies[$taxonomy])) {
+                $term_slugs = array_map('trim', explode(',', $terms));
+                $term_ids = [];
+                foreach ($term_slugs as $slug) {
+                    $term = get_term_by('slug', $slug, $taxonomy);
+                    if ($term) $term_ids[] = $term->term_id;
+                }
+                if (!empty($term_ids)) $filters[sanitize_key($taxonomy)] = $term_ids;
+            }
+        }
+        if(!empty($filters)) {
+            $config_id = 'kml_config_' . md5(json_encode($filters));
+            if (false === get_option($config_id)) {
+                update_option($config_id, $filters, 'no');
+                $saved_maps = get_option('dibraco_saved_kml_maps', []);
+                if (!in_array($config_id, $saved_maps)) {
+                    $saved_maps[] = $config_id;
+                    update_option('dibraco_saved_kml_maps', array_unique($saved_maps), 'no');
+                }
+            }
+            $location_term_ids = get_filtered_location_ids_from_config($config_id);
+        }
+    }
+    if (empty($location_term_ids)) {
+        return '';
+    }
+    $location_terms = get_terms([
+        'taxonomy'   => $location_taxonomy_slug,
+        'include'    => $location_term_ids,
+        'orderby'    => 'name',
+        'order'      => 'ASC',
+        'hide_empty' => false,
+    ]);
 
-function get_kml_download_url() {
-    return add_query_arg(['download_kml' => 'true'], home_url('/'));
-}
-function dibraco_serve_kml_file() {
-    header('Content-Type: application/vnd.google-earth.kml+xml');
-    header('Content-Disposition: attachment; filename="locations.kml"');
-    echo generate_master_kml_file();
-    exit();
-}
-function dibraco_serve_dynamic_kml_stylesheet() {
-    $company_info = get_option('company_info', []);
-    $map_title = !empty($company_info['name']) ? esc_html($company_info['name']) . ' Locations' : 'Locations KML File';
-    $sitemap_index_url = esc_url(home_url('/sitemap_index.xml')); 
-    header('Content-Type: application/xml; charset=utf-8');
-    echo '<?xml version="1.0" encoding="UTF-8"?>';
-    ?>
-    <xsl:stylesheet version="1.0"
-        xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-        xmlns:kml="http://www.opengis.net/kml/2.2"
-        exclude-result-prefixes="kml">
-    <xsl:output method="html" version="1.0" encoding="UTF-8" indent="yes"/>
-    <xsl:template match="/">
-        <html xmlns="http://www.w3.org/1999/xhtml">
-        <head>
-            <title><?php echo $map_title; ?></title>
-            <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-            <style type="text/css">
-                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif; background-color: #f0f2f5; color: #444; margin: 0; padding: 20px; }
-                .wrap { background: #fff; border: 1px solid #c3c4c7; box-shadow: 0 1px 1px rgba(0,0,0,.04); max-width: 960px; margin: 0 auto; }
-                .kml-header { background-color: #2271b1; color: #fff; padding: 20px 30px; }
-                .kml-header h1 { color: #fff; margin: 0; font-size: 24px; }
-                .kml-header p { margin: 5px 0 0; opacity: 0.9; }
-                .kml-body { padding: 20px 30px; }
-                a { color: #0073aa; text-decoration: none; }
-                a:hover { text-decoration: underline; }
-                .wp-list-table { border: 1px solid #c3c4c7; border-collapse: collapse; width: 100%; margin-top: 20px; }
-                .wp-list-table th, .wp-list-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e7e7e7; }
-                .wp-list-table thead th { background-color: #f6f7f7; font-weight: 600; }
-                .wp-list-table tbody tr:nth-child(odd) { background-color: #f8f9fa; }
-            </style>
-        </head>
-        <body>
-            <div class="wrap">
-                <div class="kml-header">
-                    <h1>KML File</h1>
-                    <p>This KML File is generated by your plugin. It is used to provide location information to Google.</p>
-                </div>
-                <div class="kml-body">
-                    <p>This KML file contains <xsl:value-of select="count(kml:kml/kml:Document/kml:Placemark|kml:kml/kml:Document/kml:Folder/kml:Placemark)"/> Location(s).</p>
-                    <p><a href="<?php echo $sitemap_index_url; ?>">&larr; Sitemap Index</a></p>
-
-                    <table class="wp-list-table widefat striped">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Latitude</th>
-                                <th>Longitude</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <xsl:for-each select="//kml:Placemark">
-                                <tr>
-                                    <td><xsl:value-of select="kml:name"/></td>
-                                    <td><xsl:value-of select="substring-before(substring-after(kml:Point/kml:coordinates, ','), ',')"/></td>
-                                    <td><xsl:value-of select="substring-before(kml:Point/kml:coordinates, ',')"/></td>
-                                </tr>
-                            </xsl:for-each>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </body>
-        </html>
-    </xsl:template>
-    </xsl:stylesheet>
-    <?php
-    exit();
-}
-
-
-function dibraco_serve_geo_sitemap() {
-    header('Content-Type: application/xml; charset=utf-8');
-    $kml_url = get_kml_download_url();
-    $lastmod_date = date('c');
-
-    $xml = '<?xml version="1.0" encoding="UTF-8"?>';
-    $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:geo="http://www.google.com/geo/sitemap/1.0">';
-    $xml .=   '<url>';
-    $xml .=     '<loc>' . esc_url($kml_url) . '</loc>';
-    $xml .=     '<lastmod>' . $lastmod_date . '</lastmod>';
-    $xml .=   '</url>';
-    $xml .= '</urlset>';
-    echo $xml;
-    exit();
-}
-
-
-
-function dibraco_custom_endpoint_listener() {
-       if (isset($_GET['dibraco_kml_xsl']) && $_GET['dibraco_kml_xsl'] === 'true') {
-        dibraco_serve_dynamic_kml_stylesheet();
+        $cards_html = '';
+    foreach ($location_terms as $location_term) {
+        $cards_html .= render_location_term_card($location_term);
     }
 
+    if(empty($cards_html)) {
+    return;
+    }
+    $output = '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0; list-style: none;">';
+    $output .= $cards_html;
+    $output .= '</div>';
+
+    return $output;
+}
+add_shortcode('filtered_locations_list', 'filtered_locations_list_shortcode');
+
+function da_get_display_data($data, $source_type) {
+    if ($source_type === 'location') {
+        $entity_id = $data;
+        $term_meta_data = get_term_meta($entity_id, '', true);
+        $term_meta_data = array_map('maybe_unserialize', array_map('current', $term_meta_data));
+        $term_meta_data['name'] = get_term($entity_id)->name;
+        $term_meta_data['phone_link'] ='';
+        $term_meta_data['phone_display'] ='';
+        $term_meta_data['additional_phone_link'] ='';
+        $term_meta_data['additional_phone_display'] =''; 
+         if (!empty($term_meta_data['phone_number'])) {
+            $term_meta_data['phone_link'] = format_telephone_for_link($term_meta_data['phone_number']);
+            $term_meta_data['phone_display'] = format_telephone_for_display($term_meta_data['phone_number']);
+        }
+        if ($term_meta_data['second_phone'] === '1' && !empty($term_meta_data['additional_phone'])) {
+            $term_meta_data['additional_phone_link'] = format_telephone_for_link($term_meta_data['additional_phone']);
+            $term_meta_data['additional_phone_display'] = format_telephone_for_display($term_meta_data['additional_phone']);
+        }
+        $term_meta_data['address'] = "{$term_meta_data['street_address']}";
+        if (!empty($term_meta_data['street_address_2']) && strlen($term_meta_data['street_address_2']) < 10) {
+            $term_meta_data['address'] = "{$term_meta_data['street_address']} {$term_meta_data['street_address_2']}";
+        } elseif (!empty($term_meta_data['street_address_2']) && strlen($term_meta_data['street_address_2']) > 10) {
+            $term_meta_data['address'] .= "<br>{$term_meta_data['street_address_2']}";
+        }
+        if($term_meta_data['addy_country'] ==='' || $term_meta_data['addy_country'] ==='US' || $term_meta_data['addy_country'] ==="USA"){
+            $term_meta_data['address'] .= "<br>{$term_meta_data['city']}, {$term_meta_data['state']} {$term_meta_data['zipcode']}";
+        }
+        if(!empty($term_meta_data['addy_country']) && ($term_meta_data['addy_country'] !=='US' && $term_meta_data['addy_country'] !=="USA")){
+            $term_meta_data['address'] .= "<br>{$term_meta_data['city']}, {$term_meta_data['state']} {$term_meta_data['zipcode']} {$term_meta_data['addy_country']}";
+        }
+        $term_meta_data['logo_url'] = '';
+        $term_meta_data['image_url'] = '';
+        if (!empty($term_meta_data['location_logo'])){
+           $logo_id = (int)$term_meta_data['location_logo'];
+           $term_meta_data['logo_url'] = you ($logo_id);
+        }
+        if (!empty($term_meta_data['exterior_image'])){
+            $image_id = (int)$term_meta_data['exterior_image'];
+            $term_meta_data['image_url'] =  wp_get_attachment_url($image_id, 'medium');
+        }
+        $term_meta_data['additional_phone'] = '';
+        if ($term_meta_data['second_phone'] === '1') {
+            $term_meta_data['additional_phone'] = $term_meta_data['additional_phone'];
+        }
+        if (!empty($term_meta_data['location_post_id'])){
+            $location_post_id = (int)$term_meta_data['location_post_id'];
+            $term_meta_data['description'] = get_post_meta($location_post_id, 'da_about_blurb', true);
+            if(empty($term_meta_data['description'])){
+                $term_meta_data['description'] = get_post_meta($location_post_id, 'da_banner_description', true);
+            }
+        }
+        $term_meta_data['manager_work_phone_display'] ='';
+        $term_meta_data['manager_work_phone_link'] ='';
+        $term_meta_data['manager_cell_display']='';
+        $term_meta_data['manager_cell_link']='';
+        $enabled_context_names = get_option('enabled_context_names');
+        if (in_array('employee', $enabled_context_names)) {
+             $portrait_enabled = get_option('enabled_unique_contexts')['employee']['portrait_images'];
+            if (!empty($term_meta_data['location_manager'])){
+                 $manager_post_id = (int)$term_meta_data['location_manager'];
+                  if ($portrait_enabled ==='1'){
+                    $portrait_id = get_post_meta($manager_post_id, 'dibraco_portrait_1', true);
+                    if (empty($portrait_id)){
+                         $portrait_id = get_post_meta($manager_post_id, 'dibraco_portrait_2', true);
+                     }
+                    if (!empty($portrait_id)){
+                        $manager_portrait_url = wp_get_attachment_image_url((int)$portrait_id, 'full');
+                    }
+                }
+                $manager_fields = get_post_meta($manager_post_id, 'employee-fields', true);
+                  $term_meta_data['manager_name']  = "{$manager_fields['given_name']} {$manager_fields['family_name']}";
+                  $term_meta_data['manager_work_email'] = $manager_fields['work_email'];
+                 if (!empty($manager_fields['work_phone'])){
+                     $term_meta_data['manager_work_phone_display'] = format_telephone_for_display($manager_fields['work_phone']);
+                      $term_meta_data['manager_work_phone_link'] = format_telephone_for_link($manager_fields['work_phone']);
+                  }
+                if (!empty($manager_fields['cell_number'])){
+                    $term_meta_data['manager_cell_display'] =  format_telephone_for_display($manager_fields['cell_number']);
+                     $term_meta_data['manager_cell_link'] = format_telephone_for_link($manager_fields['cell_number']);
+                    }
+                  $term_meta_data['manager_job_title'] = $manager_fields['job_title'];
+                   $term_meta_data['manager_image'] ='';
+                  if ($manager_portrait_url){
+                      $term_meta_data['manager_image'] = $manager_portrait_url;
+                  }
+            }
+        }
+        return $term_meta_data;
+    } else {
+        $details = $data;
+        $enabled_context_names = get_option('enabled_context_names');
+        if (in_array('locations', $enabled_context_names)) {
+             $enabled = get_option('enabled_connector_contexts');
+        $show_address_on_org = get_option('company_info')['show_address_on_org'] ??"1";
+        }
+        if ($show_address_on_org ==="1"){
+            $details['hours_of_operation'];
+            $details['address'] = "{$details['street_address']}";
+            if (!empty($details['street_address_2']) && strlen($details['street_address_2']) < 10) {
+                $details['address'] = "{$details['street_address']} {$details['street_address_2']}";
+            } elseif (!empty($details['street_address_2']) && strlen($details['street_address_2']) > 10) {
+                $details['address'] .= "<br>{$details['street_address_2']}";
+            }
+            if($details['addy_country'] ==='' || $details['addy_country'] ==='US' || $details['addy_country'] ==="USA"){
+                $details['address'] .= "<br>{$details['city']}, {$details['state']} {$details['zipcode']}";
+            }
+            if(!empty($details['addy_country']) && ($details['addy_country'] !=='US' && $details['addy_country'] !=="USA")){
+                $details['address'] .= "<br>{$details['city']}, {$details['state']} {$details['zipcode']} {$details['addy_country']}";
+            }
+            $details['latitude'];
+            $details['longitude'];
+            $details['normal_map'];
+            $details['exterior_image'];
+            if (!empty($details['exterior_image'])){
+                $image_id = (int)$details['exterior_image'];
+                $details['image_url'] =  wp_get_attachment_url($image_id, 'medium');
+            }
+        }
+        $details['hours_of_operation']='';
+        $details['address']='';
+        $details['image_url'] ='';
+        $details['normal_map'] = '';
+        $details['name'];
+        $details['location_link_url'] = home_url('/');
+        $details['company_description'];
+        $details['logo_url'] = '';
+        if (!empty($details['company_logo'])){
+           $logo_id = (int)$details['company_logo'];
+           $details['logo_url'] = wp_get_attachment_url($logo_id);
+        }
+        $details['phone_link'] ='';
+        $details['phone_display'] ='';
+        $details['additional_phone_link'] ='';
+        $details['additional_phone_display'] =''; 
+         if (!empty($details['phone_number'])) {
+            $details['phone_link'] = format_telephone_for_link($details['phone_number']);
+            $details['phone_display'] = format_telephone_for_display($details['phone_number']);
+        }
+        if ($details['second_phone'] === '1' && !empty($details['additional_phone'])) {
+            $details['additional_phone_link'] = format_telephone_for_link($details['additional_phone']);
+            $details['additional_phone_display'] = format_telephone_for_display($details['additional_phone']);
+        }
+    }
+    return $details;
+}
+
+function generate_kml_entity_description($data, $source_type = 'location') {
+    $company_info = get_option('company_info');
+    if ($source_type === 'location') {
+        $details = da_get_display_data($data, $source_type);
+        $title = $details['location_name'];
+       
+    } else {
+        $details = da_get_display_data($data, $source_type);
+        $title = $data['name'];
+    }
+    
+    $full_html = '<div style="max-width: 360px;">';
+    $full_html .= '<table class="dibraco-kml-infowindow" border="0" cellpadding="5" cellspacing="0" style="width: 100%; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.3;">';
+
+    $full_html .= '<tr><td colspan="2" style="padding-top: 10px; padding-bottom:10px; border-bottom:1px solid #eee;"><table border="0" cellpadding="0" cellspacing="0"><tr>';
+    if ($details['logo_url']) {
+        $full_html .= '<td valign="middle"><img src="' . $details['logo_url'] . '" alt="Logo" style="max-width:40px; height:auto; vertical-align:middle;"></td>';
+    }
+    $full_html .= '<td valign="middle" style="padding-left:10px;"><b style="font-size:14px;">' . $title . '</b></td>';
+    $full_html .= '</tr></table></td></tr><tr><td width="35%" valign="top" style="padding-right: 5px; padding-top:5px;">';
+    $main_info_left = '';
+    if (!empty($details['address'])) {
+        $main_info_left .= '<div style="font-weight:bold; text-decoration:underline; margin-bottom:5px;">Our Address</div>';
+        $main_info_left .= $details['address'];
+        $main_info_left .= '<br><br>';
+    }
+    if (!empty($details['phone_link'])) {
+        $main_info_left .= '<b>Phone:</b><br><a href="' . $details['phone_link'] . '">' . $details['phone_display'] . '</a>';
+    }
+    if (!empty($details['additional_phone_link'])) {
+        $main_info_left .= '<b>Alt. Phone:</b><br><a href="' . $details['additional_phone_link'] . '">' . $details['additional_phone_display'] . '</a>';
+    }
+    $main_info_left .= da_generate_opening_hours_html($details['hours_of_operation']);
+    $full_html .= $main_info_left;
+    $full_html .= '</td><td width="65%" valign="top" style="padding-left: 5px; padding-top:15px;">';
+    $main_info_right = '';
+    if (!empty($details['image_url'])) {
+        $main_info_right = '<img src="' . $details['image_url'] . '" alt="Exterior" style="max-width: 234px; width: 100%; height: auto; display: block; border: 1px solid #ccc; padding: 3px;">';
+    }
+    $full_html .= $main_info_right;
+    $full_html .= '</td></tr>';
+    $link_url = $details['location_link_url'];
+    if (!empty($link_url)) {
+        $full_html .= '<tr><td colspan="2" style="text-align: center; padding: 5px 0; border-top: 1px solid #eee; color:black; font-size:12px;">';
+        $full_html .= ($source_type === 'location') ? '<a href="' . $link_url . '">Visit Location Page</a>' : '<a href="' . $link_url . '">Visit Our Website</a>';
+        $full_html .= '</td></tr>';
+    }
+    $normal_map = $details['normal_map'];
+    if (!empty($normal_map)) {
+        $full_html .= '<tr><td colspan="2" style="text-align: center; padding: 5px 0; border-top: 1px solid #eee; font-size:12px;">';
+        $full_html .= '<a href="' . $normal_map . '" target="_blank" rel="noopener noreferrer">View on Google Maps & See Reviews</a>';
+        $full_html .= '</td></tr>';
+    }
+    if (!empty($details['description'])) {
+        $description = $details['description'];
+        $description_words = explode(' ', $description);
+        if (count($description_words) > 40) {
+            $description = implode(' ', array_slice($description_words, 0, 40)) . '...';
+        }
+        $full_html .= '<tr><td colspan="2" style="border-top:1px solid #eee; padding-top:10px;">';
+        $full_html .= '<div style="margin-bottom:10px; font-size:12px;">' . wpautop($description) . ' <a href="' . $details['location_link_url'] . '" style="font-size:12px; color:#0073e6; text-decoration:none;">Read more</a></div>';
+        $full_html .= '</td></tr>';
+    }
+       if ($source_type === 'location' && !empty($details['manager_name'])) {
+        $full_html .= '<tr><td colspan="2" style="border-top:1px solid #eee; padding-top:5px;">';
+        $full_html .= '<div style="font-weight:bold; text-decoration:underline; margin-bottom:5px;">Your Location Contact</div>';
+        $full_html .= '<table border="0" cellpadding="0" cellspacing="0" style="width:100%;"><tr><td width="40%" valign="top" style="padding-right: 5px;">';
+        if (!empty($details['manager_image'])) {
+            $full_html .= '<img src="' . $details['manager_image'] . '" alt="Market Manager" style="width:100%; height:auto;">';
+        }
+        $full_html .= '</td><td width="60%" valign="top" style="padding-left:5px;">';
+        $full_html .= '<b>' . $details['manager_name'] . '</b><br>';
+        $full_html .= '<i>' . $details['manager_job_title'] . '</i><br><br>';
+        if (!empty($details['manager_work_phone_display'])) {
+            $full_html .= '<b>Phone:</b> ' . $details['manager_work_phone_display'] . '<br>';
+        }
+        if (!empty($details['manager_work_email'])) {
+            $full_html .= '<b>Email:</b> <a href="mailto:' . $details['manager_work_email'] . '">' . $details['manager_work_email'] . '</a>';
+        }
+        $full_html .= '</td></tr></table>';
+        if (!empty($details['manager_work_phone_link'])) {
+            $full_html .= '<div style="margin-top:10px;"><a href="' . $details['manager_work_phone_link'] . '" style="background-color:#606770; color:white; padding:5px; text-align:center; text-decoration:none;">Call ' . $details['manager_given_name'] . '</a></div>';
+        }
+        $full_html .= '</td></tr>';
+    }
+
+    $full_html .= '</table></div>';
+
+    return "<![CDATA[{$full_html}]]>";
+}
+function render_location_term_card($location_term, $display_areas = 'no') {
+    $location_term_id = $location_term->term_id;
+    $term_meta_data = da_get_display_data($location_term_id, 'location'); 
+    if (!$term_meta_data['latitude']) {
+        return '';
+    }
+    $location_name = $term_meta_data['location_name'];
+    $link_url = $term_meta_data['location_link_url'];
+   
+    $hours = $term_meta_data['hours_of_operation'];
+    $service_areas_html = '';
+    if ($display_areas ==='yes' && get_option('locations_areas_status') ==='both'){
+        $area_term_ids = $term_meta_data['associated_act_terms'];
+        if (!empty($area_term_ids)){
+            $area_links = [];
+            foreach ($area_term_ids as $area_id) {
+                $area_term_name = get_term($area_id)->name;
+                $area_link_url = get_term_meta($area_id, 'service_area_link_url', true);
+                $area_links[] = "<a style='font-size: 13px' href='{$area_link_url}'>{$area_term_name}</a>";
+            }
+            $service_areas_html .= '<div style="border-top: 1px dashed #eee;"><span style="font-weight: bold; font-size: 14px;">Service Areas: </span>';
+            $service_areas_html .= implode(', ', $area_links);
+            $service_areas_html .= '</div>';
+    }
+    }
+
+    $manager_html = '';
+    if (!empty($manager_id)) {
+        $employee = get_post_meta($manager_id, 'employee-fields', true);
+        $full_name = trim(($employee['given_name'] ?? '') . ' ' . ($employee['family_name'] ?? ''));
+        $work_phone = $employee['work_phone'] ?? '';
+        
+        if (!empty($full_name) || !empty($work_phone)) {
+            $manager_html .= '<div style="margin-top: 5px; padding-top: 5px; border-top: 1px dashed #eee;">';
+            $manager_html .= '<span style="font-weight: bold; color: #333;">' . $full_name . '</span><br>';
+            if($work_phone) {
+                $manager_html .= '<a href="' . format_telephone_for_link($work_phone) . '">' . format_telephone_for_display($work_phone) . '</a>';
+            }
+            $manager_html .= '</div>';
+        }
+    }
+    $output = '<div style="line-height: 1.4; font-family: Arial, sans-serif; font-size: 14px; padding: 5px; background-color: #f9f9f9;">';
+    $output .= '<h4 style="margin: 0;">' . $location_name . '</h4>';
+    if (!empty($term_meta_data['address'])){
+         $output .= '<p style="margin: 0;">' . $term_meta_data['address'] .'</p>';
+    }
+     if (!empty($term_meta_data['phone_link'])) {
+        $output .= '<b>Phone:</b><br><a href="' . $term_meta_data['phone_link'] . '">' . $term_meta_data['phone_display'] . '</a>';
+    }
+    if (!empty($term_meta_data['additional_phone_link'])) {
+        $output .= '<b>Alt. Phone:</b><br><a href="' . $term_meta_data['additional_phone_link'] . '">' . $term_meta_data['additional_phone_display'] . '</a>';
+    }
+    if ($hours) {
+        $output .= '<div style="font-size: 14px; color: #666; margin-top: 5px;">' . da_generate_opening_hours_html($hours) . '</div>';
+    }
+    if ($service_areas_html){
+        $output .= $service_areas_html;
+    }
+    if($manager_html){
+        $output .= $manager_html;
+    }
+    if ($link_url) {
+        $output .= '<p style="margin: 5px 0;"><a href="' . $link_url . '">Visit Location Page</a></p>';
+    }
+    $output .= '</div>';
+
+    return $output;
+}
+function dibraco_custom_endpoint_listener() {
     if (isset($_GET['download_custom_kml']) && !empty($_GET['download_custom_kml'])) {
         $config_id = sanitize_key($_GET['download_custom_kml']);
         
@@ -1047,3 +1046,45 @@ function dibraco_custom_endpoint_listener() {
     }
 }
 add_action('init', 'dibraco_custom_endpoint_listener');
+function my_locations_list_shortcode($atts) {
+    $atts = shortcode_atts(['areas' => 'no', 'orderby' => 'name', 'order' => 'ASC', 'hide_empty' => false], $atts, 'my_locations_list');
+    $service_areas = $atts['areas']; 
+    $company_info = get_option('company_info');
+    $enabled = get_option('enabled_connector_contexts');
+    $location_taxonomy_slug = $enabled['locations']['taxonomy'];
+    $main_term_id = $enabled['locations']['main_term'];
+        $show_address_on_org = get_option('company_info')['show_address_on_org'] ??"1";
+    $ignore_main_term = $enabled['locations']['ignore_main_term'];
+    $output = '';
+    if ($show_address_on_org ==="1"){
+        $company_name = $company_info['name'];
+        $corp_phone = $company_info['phone_number'];
+       $corp_address_lines = array_filter([
+    $company_info['street_address'],
+    $company_info['street_address_2'],
+    implode(' ', array_filter([$company_info['city'], $company_info['state'], $company_info['zipcode']]))]);
+    $output .= '<div style="grid-column: 1 / -1; margin-bottom: 10px; line-height: 1.4; font-family: Arial, sans-serif; font-size: 14px; color: #555; padding: 5px; background-color: #f9f9f9;">';
+        $output .= '<h4 style="margin: 0; font-size: 16px; color: #222;">' . $company_name . '</h4>';
+        if (!empty($corp_address_lines)) {
+            $output .= '<p style="margin: 0;">' . implode('<br>', array_map('esc_html', $corp_address_lines)) . '</p>';
+        }
+        if (!empty($corp_phone)) {
+            $output .= '<p style="margin: 0;"><a href="' . esc_url(format_telephone_for_link($corp_phone)) . '" style="color: #0073aa; text-decoration: none;">' . esc_html(format_telephone_for_display($corp_phone)) . '</a></p>';
+        }
+        $output .= '</div>';
+    }
+    $location_terms = get_terms(['taxonomy' => $location_taxonomy_slug, 'orderby' => $atts['orderby'], 'order' => $atts['order'], 'hide_empty' => $atts['hide_empty']]);
+    $cards_html = '';
+    foreach ($location_terms as $location_term) {
+        if (($ignore_main_term ==="1") && $main_term_id && $location_term->term_id == $main_term_id) continue;
+        $cards_html .= render_location_term_card($location_term, $service_areas);
+    }
+    
+    if(empty($cards_html)) {
+         return '';
+    }
+
+    $output .= '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0; list-style: none;">' . $cards_html . '</div>';
+    return $output;
+}
+add_shortcode('my_locations_list', 'my_locations_list_shortcode');

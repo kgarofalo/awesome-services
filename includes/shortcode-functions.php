@@ -1,5 +1,43 @@
 <?php
-require_once AWESOME_SERVICES_PATH . 'awesome-services.php';
+require_once AWESOME_SERVICES_PATH . 'awesome-services-main.php';
+
+function da_get_connector_term_or_null($post_id) {
+	$status = get_option('locations_areas_status');
+	if (($status !== 'both') && ($status !== 'multi_locations') && ($status !=='multi_areas')) {
+		return null;
+	}
+    $connector_contexts = get_option('enabled_connector_contexts');
+    if ($status === 'both'){
+	    $connector_tax = $connector_contexts['service_areas']['taxonomy'];
+	    $connector_term_id = dibraco_get_current_term_id_for_post($post_id, $connector_tax);
+	    if(empty($connector_term_id)){
+            $connector_tax = $connector_contexts['locations']['taxonomy'];
+            $connector_term_id = dibraco_get_current_term_id_for_post($post_id, $connector_tax);
+	    }
+	    if (!empty($connector_term_id)){
+	         return $connector_term_id;
+            }
+    }
+	if ($status === 'multi_areas'){
+	    $connector_tax = $connector_contexts['service_areas']['taxonomy'];
+	    $connector_term_id = dibraco_get_current_term_id_for_post($post_id, $connector_tax);
+	     if (!empty($connector_term_id)){
+	         return $connector_term_id;
+        }
+    }
+	if ($status ==='multi_locations'){
+	    $connector_tax = $connector_contexts['locations']['taxonomy'];
+        $connector_term_id = dibraco_get_current_term_id_for_post($post_id, $connector_tax);
+	    if (!empty($connector_term_id)){
+	         return $connector_term_id;
+            }
+	}
+	return null;
+}
+
+
+
+
 function carolina_display_repeater_data_shortcode() {
     $post_id = get_the_ID();
     $repeater_data = get_post_meta( $post_id, '_list_repeater', true );
@@ -37,42 +75,9 @@ function carolina_display_repeater_data_shortcode() {
 }
 add_shortcode( 'dibraco_display_repeater_data', 'carolina_display_repeater_data_shortcode' );
 
-function dibraco_get_all_field_definitions() {
-    static $fields = null;
 
-    if ($fields !== null) {
-        return $fields;
-    }
-    $fields = [];
-    $simple_fields = array_merge(
-        get_banner_fields(),
-        get_contact_fields(),
-        get_section_title_fields(),
-        get_about_fields()
-    );
-
-    $image_fields = array_merge(
-        get_landscape_image_fields(),
-        get_portrait_image_fields(),
-		get_term_icon_field()
-    );
-
-    foreach (array_merge($simple_fields, $image_fields) as $key => $config) {
-        if (strpos($key, '_lock') === false) {
-            $fields[$key] = ['storage' => 'meta', 'type' => $config['type']];
-        }
-    }
-
-	foreach (get_employee_fields()['employee-fields']['fields'] as $key => $config) {
-        $fields[$key] = ['storage' => 'array', 'array_key' => 'employee-fields', 'type' => $config['type']];
-    }
-
-    foreach (get_certification_fields()['certification_data']['fields'] as $key => $config) {
-        $fields[$key] = ['storage' => 'array', 'array_key' => 'employee_certification_data', 'type' => $config['type']];
-    }
-    return $fields;
-}
 function dibraco_master_shortcode_handler($atts) {
+    error_log('called');
     $shortcode_tag = $atts['field_key'];
     $all_fields = dibraco_get_all_field_definitions();
     if (!isset($all_fields[$shortcode_tag])) {
@@ -83,7 +88,7 @@ function dibraco_master_shortcode_handler($atts) {
         return ''; 
     }
     $field_info = $all_fields[$shortcode_tag];
-    $storage_type = $field_info['storage'];
+    $storage_type = $field_info['storage']??'';
     $field_type = $field_info['type'];
     $value = '';
     if ($storage_type === 'meta') {
@@ -132,7 +137,63 @@ function dibraco_register_all_dynamic_shortcodes() {
         }
     }
 }
-add_action('init', 'dibraco_register_all_dynamic_shortcodes');
+//add_action('init', 'dibraco_register_all_dynamic_shortcodes');
+
+if ($field_type === 'image') {
+    if (is_numeric($value)) {
+        // Old format: attachment ID
+        $size = isset($atts['size']) ? sanitize_text_field($atts['size']) : 'large';
+        if (isset($atts['output']) && $atts['output'] === 'url') {
+            return wp_get_attachment_image_url($value, $size);
+        }
+        return wp_get_attachment_image($value, $size);
+    } else {
+        // New format: direct URL
+        if (isset($atts['output']) && $atts['output'] === 'url') {
+            return $value;
+        }
+        $size_class = isset($atts['size']) ? sanitize_text_field($atts['size']) : 'large';
+        return '<img src="' . $value . '" class="size-' . $size_class . '" alt="">';
+    }
+}
+function dibraco_image_shortcode_handler($atts = [], $content = null, $meta_key = '') {
+    if (is_admin()) {
+        return '';
+    }
+    
+    $post_id = get_the_ID();
+    if (!$post_id) {
+        return '';
+    }
+    
+    $value = get_post_meta($post_id, $meta_key, true);
+    if (empty($value)) {
+        return '';
+    }
+    
+    // If it's an ID, get the URL
+    if (is_numeric($value)) {
+        $size = $atts['size'] ?? 'full';
+        return wp_get_attachment_image_url($value, $size) ?: '';
+    }
+    
+    // Otherwise it's already a URL, return it
+    return $value;
+}
+    
+function dibraco_register_image_shortcodes() {
+    if (is_admin()) {
+        return;
+    }
+    add_shortcode('term_icon', 'dibraco_image_shortcode_handler');
+    $limit = 20; 
+    for ($i = 1; $i <= $limit; $i++) {
+        add_shortcode("dibraco_landscape_{$i}", 'dibraco_image_shortcode_handler');
+        add_shortcode("dibraco_portrait_{$i}", 'dibraco_image_shortcode_handler');
+    }
+}
+add_action('init', 'dibraco_register_image_shortcodes');
+
 function display_post_taxonomy_terms_list($atts) {
     $atts = shortcode_atts(array('taxonomy' => 'category'), $atts, 'post_taxonomy_terms' );
     $taxonomy_slug = $atts['taxonomy'];
@@ -148,21 +209,13 @@ function display_post_taxonomy_terms_list($atts) {
     return '';
 }
 add_shortcode('post_taxonomy_terms', 'display_post_taxonomy_terms_list');
-
-
 function dibraco_location_map_shortcode($atts) {
-    $atts = shortcode_atts([
-        'view'      => 'normal',
-        'loc'       => '',
-        'width'     => '100%',
-        'height'    => '400px',
-        'max_width' => '600px'
-    ], $atts, 'dibraco_location_map');
+    $atts = shortcode_atts([ 'view' => 'normal', 'loc' => '', 'width' => '100%', 'height' => '400px', 'max_width' => '600px' ], $atts, 'dibraco_location_map');
 
     $view_type = $atts['view'];
     $location_slug = $atts['loc'];
     $post_id = get_the_ID();
-    if (!$post_id) {
+    if (!$post_id && !$location_slug) {
         return '';
     }
     if ($view_type === 'street'){
@@ -170,10 +223,10 @@ function dibraco_location_map_shortcode($atts) {
     } else {
         $key = 'normal_map';
     }
-    $location_term_id = da_get_location_term_or_default($post_id, $location_slug);
+    $location_term_id = da_get_location_term_or_default($post_id, '', $location_slug);
     $map_embed_url ='';
     if ($location_term_id) {
-       $map_embed_url = get_term_meta($location_term_id, $key, true );
+       $map_embed_url = get_term_meta($location_term_id, $key, true);
     } else {
       $map_embed_url = get_option('company_info')[$key]??'';
     }
@@ -202,7 +255,6 @@ function dibraco_get_processed_context_data($context_name) {
     if (!isset($enabled_contexts[$context_name])) {
         return []; 
     }
-    
     $context_data = $enabled_contexts[$context_name];
     $context_type = $context_data['context_type'];
     $context_name = $context_data['context_name'];
@@ -226,7 +278,6 @@ function dibraco_display_related_posts_list($atts) {
     return $output;
 }
 add_shortcode('da_related_posts_list', 'dibraco_display_related_posts_list');
-
 
 function dibraco_display_related_list_comma($atts) {
       $atts = shortcode_atts([
@@ -257,7 +308,7 @@ $separator = $atts['separator'];
 }
 add_shortcode('da_related_list_comma', 'dibraco_display_related_list_comma');
 function dibraco_enqueue_frontend_styles() {
-    wp_register_style(
+    wp_enqueue_style(
         'da-photo-hover-style', 
         AWESOME_SERVICES_URL . 'front-end-css/da-photo-hover.css', 
         [], 
@@ -265,6 +316,89 @@ function dibraco_enqueue_frontend_styles() {
     );
 }
 add_action('wp_enqueue_scripts', 'dibraco_enqueue_frontend_styles');
+function da_related_photo_hover_shortcode_2($atts) {
+    $current_post_id = get_the_ID();
+    $current_post_type = get_post_type($current_post_id);
+    $enabled_contexts = get_option('enabled_contexts');
+    if (empty($enabled_contexts)) {
+        return;
+    }
+
+    $context_looking_for = $atts['context'] ?? '';
+    if ($context_looking_for === '') {
+        $enabled_type_contexts = get_option('enabled_type_contexts');
+        if (empty($enabled_type_contexts)) {
+            return;
+        }
+
+        foreach ($enabled_type_contexts as $context => $context_data) {
+            $post_per_term = $context_data['post_per_term'];
+            $landscape_images_enabled = $context_data['landscape_images'];
+            if ($post_per_term === '0') {
+                continue;
+            }
+            if ($landscape_images_enabled !== '1') {
+                continue;
+            }
+
+            $context_looking_for = $context_data['context_name'];
+            $related_connectors = $context_data['related_connectors'];
+
+            if (empty($related_connectors)) {
+                $relationship_taxonomy = $context_data['taxonomy'];
+                $context_post_type = $context_data['post_type'];
+                $current_term_id = dibraco_get_current_term_id_for_post($current_post_id, $relationship_taxonomy);
+                $main_post_map = get_option("main_posts_{$context_looking_for}");
+
+                foreach ($main_post_map as $type_term_id => $post_id) {
+                    $output = '';
+                    if ($current_term_id !== $post_id) {
+                        $img1 = get_post_meta($post_id, 'dibraco_landscape_1', true);
+                        $img2 = get_post_meta($post_id, 'dibraco_landscape_2', true);
+                        if (!empty($img1)) $image_options[] = wp_get_attachment_url($img1);
+                        if (!empty($img2)) $image_options[] = wp_get_attachment_url($img2);
+                        $final_img = $image_options[array_rand($image_options)];
+                        if (empty($final_img)) {
+                            continue;
+                        }
+                        $post_permalink = get_permalink($post_id);
+                        $display_text = get_the_title($post_id);
+                        $output .= '<a href="' . $post_permalink . '" class="da-related-photo-link" aria-label="' . $display_text . '" title="' . $display_text . '">';
+                        $output .= '<img src="' . $final_img . '" alt="' . $display_text . '">';
+                        $output .= '<div class="da-related-photo-title">' . $display_text . '</div>';
+                        $output .= '</a>';
+                    }
+                }
+                return $output;
+            }
+            if (!empty($related_connectors)) {
+                $enabled_connector_contexts = get_option('enabled_connector_contexts');
+                $related_connector_count = $context_data['related_connector_count'];
+                if ($related_connector_count ===2){
+                    $connector_taxonomy = $related_connectors['service_areas']['taxonomy'];
+                    $related_term = dibraco_get_current_term_id_for_post($current_post_id, $service_area_taxonomy);
+                    if (empty($related_term)){
+                       $connector_taxonomy =  $related_connectors['locations']['taxonomy'];
+                       $related_term = dibraco_get_current_term_id_for_post($current_post_id, $service_area_taxonomy);
+                    }
+                }
+                foreach ($related_connectors as $related_connector => $related_connector_data) {
+                    $relationship_taxonomy = $related_connector_data['taxonomy'];
+                    $related_term = dibraco_get_current_term_id_for_post($current_post_id, $relationship_taxonomy); //mihgt be empty 
+                    if ($related_term === '') {
+                        continue;
+                    }
+                }
+            }
+            
+            if ($context_looking_for !== '') {
+                break;
+            }
+        }
+    }
+}
+add_shortcode('da_related_photo_hover_2', 'da_related_photo_hover_shortcode_2');
+
 
 function da_related_photo_hover_shortcode($atts) {
     $attributes = shortcode_atts(['context' => 'main_service'], $atts); 
@@ -280,7 +414,7 @@ function da_related_photo_hover_shortcode($atts) {
         $related_link = $card['related_post_url'];
         $display_text = $card['related_post_title'];
         $image_options = [];
-        if ($context_config['repeater_images'] === '1') {
+        if ($context_config['landscape_images'] === '1') {
             $img1 = get_post_meta($post_id, 'dibraco_landscape_1', true);
             $img2 = get_post_meta($post_id, 'dibraco_landscape_2', true);
             if (!empty($img1)) $image_options[] = wp_get_attachment_url($img1);
