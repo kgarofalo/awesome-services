@@ -1,73 +1,69 @@
 <?php
-function get_prepopulated_addresses($post_id = '') {
-    $address_keys = array_keys(get_address_fields());
-    $company_info = get_option('company_info');
-    $addresses = [];
-    $data = [];
-    foreach ($address_keys as $key) {
-        $data[$key] = $company_info[$key];
-    }
-    $addresses['main_address'] = ['data' => $data];
 
+function get_prepopulated_addresses() {
+$address_keys = ["street_address", "street_address_2", "city", "state", "zipcode", "addy_country"];
     $status = get_option('locations_areas_status');
-    if ($status === 'multi_locations' || $status === 'both') {
-        $locations_taxonomy = get_option('enabled_connector_contexts')['locations']['taxonomy'];
-        $terms = get_terms(['taxonomy' => $locations_taxonomy,'hide_empty' => true]);
-        if (!is_wp_error($terms)) {
-            foreach ($terms as $term) {
-                $data = [];
-                $has_data = false;
-                foreach ($address_keys as $key) {
-                    $value =  get_term_meta($term->term_id, $key, true);
-                    $data[$key] = $value;
-                    if ($value !== '') {
-                        $has_data = true;
-                    }
-                }
-                if ($has_data) {
-                    $addresses[$term->slug] = ['data' => $data];
-                }
-            }
-            if ($post_id !== '') {
-                $assigned_terms = wp_get_post_terms($post_id, $locations_taxonomy);
-                if (!empty($assigned_terms)) {
-                    $slug = $assigned_terms[0]->slug;
-                    if (isset($addresses[$slug])) {
-                        $addresses = [$slug => $addresses[$slug]] + $addresses;
-                    }
-                }
-            }
-        }
+    $company_info = get_option('company_info',[]);
+    $addresses = []; 
+    if (!empty($company_info)){
+        $show_address_on_org = $company_info['show_address_on_org'];
+            $data = [];
+    if ($show_address_on_org==='1'){
+        $company_info = get_option('company_info',[]);
+     foreach ($address_keys as $address_part) {
+           $data[$key] = $company_info[$address_part];
+     }
+         $addresses['main_address'] = ['data' => $data];
     }
+}
+  if ($status === 'multi_locations' || $status === 'both') {
+    $locations_context= get_option('enabled_connector_contexts')['locations'];
+        $locations_taxonomy = $locations_context['taxonomy'];
+        $terms = get_terms(['taxonomy' => $locations_taxonomy,'hide_empty' => true]);
+    }
+    foreach ($terms as $term) {
+        $data = [];
+        $has_data = false;
+        foreach ($address_keys as $key) {
+            $value =  get_term_meta($term->term_id, $key, true);
+            $data[$key] = $value;
+                if ($value !== '') {
+                    $has_data = true;
+                }
+            }
+            if ($has_data) {
+                $addresses[$term->slug] = ['data' => $data];
+            }
+            }
+         
     return $addresses;
 }
 
-function da_get_job_fields($post_id = '', $prepopulated_addresses = []) {
-    $prepopulated_address_map = [];
-    foreach ($prepopulated_addresses as $key => $address) {
+function da_get_job_fields() {
+    $addresses = get_prepopulated_addresses();
+    foreach ($addresses as $key => $address) {
         $prepopulated_address_map[$key] = $key;
     }
+    
     $options = getJobPostingOptions();
-    $address_fields = get_address_fields();
-unset($address_fields['google_map_embed']); 
     $current_date = current_time('Y-m-d');
 
 $job_details_fields = [
 	'type' => 'visual_section',
 	'label' => 'Job Details',
 	'fields' => [
-		'job_title'       => ['label' => 'Job Title', 'type' => 'text', 'value' => ''],
+		'job_title'       => ['type' => 'text', 'value' => ''],
+		'description' => ['label' => 'Description', 'type' => 'wysiwyg', 'value' => ''],
 		'employment_type' => ['label' => 'Employment Type', 'type' => 'select', 'options' => $options['employment_types'], 'value' => 'FULL_TIME'],
-		'direct_apply'    => ['label' => 'Apply Directly Online', 'type' => 'toggle', 'value' => "1", 'options_label' => ["1" => 'No', "0" => 'Yes']],
-		'job_date_posted' => ['label' => 'Date Posted', 'type' => 'date', 'value' => $current_date],
-		'immediate_start' => ['label' => 'Start Immediately?', 'type' => 'toggle', 'value' => "0"],
-		'job_start_date'  => ['label' => 'Start Date', 'type' => 'date', 'value' => $current_date,  'condition' => ['field' => 'immediate_start', 'values' => ["0"]]],
-		'job_expires'   => ['label' => 'Stop Job Post By Date?', 'type' => 'toggle', 'value' => "0"],
-		'valid_through'   => ['label' => 'Valid Through', 'type' => 'date', 'value' => $current_date, 'condition' => ['field' => 'job_expires', 'values' => ["1"]]],
 		'work_hours'      => ['label' => 'Work Hours', 'type' => 'text', 'value' => '9 to 5'],
-		'reports_to'      => ['label' => 'Reports To', 'type' => 'text', 'value' => ''],
+		'immediate_start' => ['label' => 'Start Immediately?', 'type' => 'toggle', 'value' => "0"],
+		'job_expires'   => ['label' => 'Hire By Date?', 'type' => 'toggle', 'value' => "0"],
+		'job_start_date'  => ['label' => 'Start Date', 'type' => 'date', 'value' => $current_date,  'condition' => ['field' => 'immediate_start', 'values' => ["0"]]],
+		'valid_through'   => ['type' => 'date', 'value' => $current_date, 'condition' => ['field' => 'job_expires', 'values' => ["1"]]],
+		'direct_apply'    => ['label' => 'Apply Online', 'type' => 'toggle', 'value' => "1", 'options_label' => ["1" => 'No', "0" => 'Yes']],
+        'job_date_posted' => ['label' => 'Date Posted', 'type' => 'date', 'value' => $current_date],
 		'identifier'      => ['label' => 'Job Identifier', 'type' => 'text', 'value' => ''],
-		'description' => ['label' => 'Description', 'type' => 'wysiwyg', 'value' => '']
+		'reports_to'      => ['label' => 'Reports To', 'type' => 'text', 'value' => ''],
 	]
 ];
 $compensation_fields = [
@@ -84,56 +80,70 @@ $compensation_fields = [
             ]
         ],
         'payment_interval' => ['label' => 'Per', 'type' => 'select', 'options' => $options['salary_types'], 'value' => 'YEAR'],
-        'job_benefits' => ['label' => 'Benefits Offered?', 'type' => 'toggle', 'value' => "0", 'option_labels' => ["1" => 'No', "0" => 'Yes']]
     ]
 ];
-$global_benefits = get_option('global_benefits',[]);
-$benefit_checkboxes = [];
-foreach ($global_benefits as $key => $benefit) {
-    $benefit_checkboxes[$key] = [
-        'label' => $benefit,
-        'type' => 'checkbox',
-        'value' => "0"
-    ];
+
+$benefits = get_global_benefit_fields();
+$prefixed_benefits = [];
+foreach ($benefits as $name => $config) {
+    $prefixed_benefits["{$name}"] = $config;
 }
+
+
 
 $benefits_fields = [
 	'type' => 'visual_section',
 	'label' => 'Benefits',
-	'condition' => ['field' => 'job_benefits', 'values' => ["1"]],
+	
 	'fields' => [
-		'benefits' => ['label' => 'Available Benefits', 'type' => 'group', 'fields' => $benefit_checkboxes,
-		],
-		'add_new_benefit' => ['label' => 'Add New Benefit', 'type' => 'text'],
-		'confirm_add_new_benefit' => ['type' => 'button', 'label' => 'Add Benefit']
-	]
-];
+	    'job_benefits' => ['label' => 'Benefits Offered?', 'type' => 'toggle', 'value' => "0", 'option_labels' => ["1" => 'No', "0" => 'Yes']],
+		'select_job_benefits' => ['type' => 'visual_group',  'condition' => ['field' => 'job_benefits', 'values' => ["1"]],
+		'fields' => [
+		    'benefit' => ['label' => 'Available Benefits', 'type' => 'group', 'fields' => $prefixed_benefits], 
+            'add_new_benefit' => ['type' => 'text', 'ui_only' => true],
+            'confirm_add_new_benefit' => ['type' => 'button', 'label' => 'Add Benefit', 'class' => '']
+	    ]]]
+	   ];
+
 $education_requirements = [
     'type' => 'visual_section',
-    'label' => 'Education & Experience Setup',
+    'label' => 'Education & Qualifications',
     'fields' => [
         'education_setup' => ['type' => 'field_group', 'fields' => [
             'degree_required' => ['label' => 'Degree Required?', 'type' => 'toggle', 'options_label' => ["1" => 'No', "0" => 'Yes'], 'value' => "0"],
-            'experience_required' => ['label' => 'Experience Required?', 'type' => 'toggle', 'value' => "0", 'options_label' => ["1" => 'No', "0" => 'Yes']],
-            'experience_in_place_of_education' => ['label' => 'Experience instead of Education', 'options_label' => ["0" => 'Yes', "1" => 'No'], 'type' => 'toggle', 'value' => "0", 'condition' => ['field' => 'experience_required', 'values' => ["1"]]],
             'qualifications_required' => ['label' => 'Qualifications Required?', 'type' => 'toggle', 'options_label' => ["1" => 'No', "0" => 'Yes'], 'value' => "0"],
         ]],
-        'education_experience_fields' => ['type' => 'field_group', 'fields' => [
+        'education_fields' => ['type' => 'field_group', 'fields' => [
             'degree_requirements' => ['label' => 'Degree Requirement', 'type' => 'select', 'options' => $options['education_levels'], 'value' => 'bachelor_degree', 'condition' => ['field' => 'degree_required', 'values' => ["1"]]],
-            'months_of_experience' => ['label' => 'Months of Experience', 'type' => 'number', 'value' => '', 'condition' => ['field' => 'experience_required', 'values' => ["1"]]],    
-            'experience_description' => ['label' => 'Describe Experience Needed', 'type' => 'wysiwyg', 'value' => '', 'condition' => ['field' => 'experience_required', 'values' => ["1"]]],
             'qualifications' => ['label' => 'Required Qualifications?', 'type' => 'wysiwyg', 'value'=> '', 'condition' => ['field' => 'qualifications_required', 'values' => ["1"]]],
         ]]
     ]
 ];
 
+$experience_requirements = [
+    'type' => 'visual_section',
+    'label' => 'Experience Requirements',
+    'fields' => [
+        'experience_setup' => ['type' => 'field_group', 'fields' => [
+            'experience_required' => ['label' => 'Experience Required?', 'type' => 'toggle', 'value' => "0", 'options_label' => ["1" => 'No', "0" => 'Yes']],
+            'experience_in_place_of_education' => ['label' => 'Exp Instead of Edu?', 'options_label' => ["0" => 'Yes', "1" => 'No'], 'type' => 'toggle', 'value' => "0", 'condition' => ['field' => 'experience_required', 'values' => ["1"]]],
+            'months_of_experience' => ['label' => 'Months of Experience', 'type' => 'number', 'value' => '', 'condition' => ['field' => 'experience_required', 'values' => ["1"]]],    
+            'experience_description' => ['label' => 'Describe Experience Needed', 'type' => 'wysiwyg', 'value' => '', 'condition' => ['field' => 'experience_required', 'values' => ["1"]]],
+        ]]
+    ]
+];
 $job_location_fields = [
 	'type' => 'visual_section',
 	'label' => 'Job Location',
 	'fields' => [
         'job_location_type' => ['label' => 'Job Location Type', 'type' => 'select', 'value' => 'Place', 'options' => $options['location_types']],     
-        'addresses' => ['label' => 'Choose an Address', 'type' => 'select', 'options' => $prepopulated_address_map, 'value' => 'Place', 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']]],
-        'address' => ['label' => 'Address Details', 'type' => 'group', 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']], 'fields' => $address_fields],
+        'addresses' => ['label' => 'Choose an Address', 'type' => 'select', 'options' => $prepopulated_address_map, 'value' => '', 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']]],
+        'street_address' => ['type' => 'text', 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']]],
+        'street_address_2' => ['type' => 'text', 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']]],
+        'address_city' => ['type' => 'text', 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']]],
+        'address_state' => ['type' => 'text', 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']]],
+        'zipcode' => ['type' => 'text', 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']]],
+        'addy_country' => ['type' => 'text', 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']]],
 		'restriction_type'  => ['label' => 'Restriction Type', 'type' => 'select', 'value' => '', 'options' => $options['geo_types'],  'condition' => ['field' => 'job_location_type', 'values' => ['TELECOMMUTE', 'Place_TELECOMMUTE']]],
 		'country' => ['label' => 'Allowed Country', 'type' => 'repeater', 'condition' => ['field' => 'restriction_type', 'values' => ["country"]], 'fields' => ['country_name' => ['label' => 'Country Name', 'type' => 'text', 'value' => '']]],
 		'state' => ['label' => 'Allowed States', 'type' => 'repeater', 'condition' => ['field' => 'restriction_type', 'values' => ["state"]], 'fields' => ['state_name' => ['label' => 'State Name', 'type' => 'text', 'value' => '']]],
@@ -146,11 +156,15 @@ $responsibilities_skills_fields = [
 	'label' => 'Responsibilities and Skills',
 	'fields' => [
 		'responsibility_description' => ['label' => 'Responsibility Description', 'type' => 'wysiwyg', 'value' => ''],
-		'skills' => ['type' => 'repeater', 'fields' => ['skill' => ['type' => 'text', 'value' => '']]]
-	]
+		'skills' => [
+		    'type' => 'repeater', 
+		    'fields' => [
+		        'skill' => ['type' => 'text', 'value' => ''],
+		]
+		]]
 ];
 
-	return ['job-details' => $job_details_fields, 'job-location' => $job_location_fields, 'education-requirements' => $education_requirements, 'compensation' => $compensation_fields, 'benefits_section' => $benefits_fields, 'responsibilities-skills' => $responsibilities_skills_fields];
+	return ['job-details' => $job_details_fields, 'job-location' => $job_location_fields, 'education-requirements' => $education_requirements, 'experience' => $experience_requirements,'compensation' => $compensation_fields, 'benefits_section' => $benefits_fields, 'responsibilities-skills' => $responsibilities_skills_fields];
 }
 
 function getJobPostingOptions() {
@@ -164,202 +178,186 @@ function getJobPostingOptions() {
 }
 
 function handle_add_new_benefit_ajax() {
-    if (!current_user_can('edit_posts')) return;
-    $new_benefit_name = $_POST['benefit_name'];
-    if (empty($new_benefit_name)) wp_send_json_error(['message' => 'Benefit name cannot be empty.']);
-    $global_benefits = (array) get_option('global_benefits', []);
-    $benefit_key = strtolower(str_replace(' ', '_', $new_benefit_name));
-    $capitalized_benefit_name = ucwords(strtolower($new_benefit_name));
-    if (!array_key_exists($benefit_key, $global_benefits)) {
-        $global_benefits[$benefit_key] = $capitalized_benefit_name;
-        update_option('global_benefits', $global_benefits);
-        $post_id = get_the_ID();
-        $job_meta = get_post_meta($post_id, '_job_meta', true);
-        if (!is_array($job_meta)) $job_meta = [];
-        $job_meta['benefits_' . $benefit_key] = '1';
-        update_post_meta($post_id, '_job_meta', $job_meta);
-        wp_send_json_success(['benefit_name' => $capitalized_benefit_name, 'benefit_key' => $benefit_key, 'added' => true]);
+    global $post; 
+    $benefit_name = trim($_POST['benefit_name'] ?? '');
+    if ($benefit_name === '') {
+        wp_send_json_error(['message' => 'Benefit name cannot be empty.']);
     }
-    wp_send_json_success(['benefit_name' => $new_benefit_name, 'benefit_key' => $benefit_key, 'added' => false]);
+    $benefit_key = strtolower(str_replace(' ', '_', sanitize_text_field($benefit_name)));
+    $global_benefits = get_option('global_benefits');
+    if (isset($global_benefits[$benefit_key])) {
+        wp_send_json_error(['message' => 'name exists']);
+    }
+    $global_benefits[$benefit_key] = $benefit_key;
+    update_option('global_benefits', $global_benefits);
+    $checkbox_html = FormHelper::generateCheckBox("benefit_{$benefit_key}", $benefit_key, '1', []);
+
+    $job_meta = get_post_meta($post->ID, '_job_meta', true);
+    $job_meta["benefit_{$benefit_key}"] = '1';
+    update_post_meta($post->ID, '_job_meta', $job_meta);
+    wp_send_json_success([ 'benefit_html' => $checkbox_html, 'added' => true]);
 }
 add_action('wp_ajax_add_new_benefit', 'handle_add_new_benefit_ajax');
 
 
 function display_job_meta_box($post) {
     $post_id = $post->ID; 
-     $nonce = wp_create_nonce('dibraco_save_job_meta'); 
+    $nonce = wp_create_nonce('dibraco_save_job_meta'); 
     $job_meta = get_post_meta($post_id, '_job_meta', true);
+ 
     ?>
     <div class="job-meta-box">
         <input type="hidden" name="dibraco_job_meta_nonce" value="<?= esc_attr($nonce); ?>" />
         <?php
-        $prepopulated_addresses = get_prepopulated_addresses($post_id);
-        $job_fields = da_get_job_fields($post_id, $prepopulated_addresses); 
-        echo formHelper::generateField('doesnt_matter', ['type'=> 'starttracking', 'meta_array' => $job_meta]);
-        foreach ($job_fields as $section => $section_data) {
-           echo formHelper::generateVisualSection($section, $section_data); 
+            $array_keys = dibraco_extract_field_names_helper(da_get_job_fields());
+        $job_fields_template = da_get_job_fields(); 
+        $storage_keys=dibraco_extract_nested_arrays_test($job_fields_template);
+
+
+        foreach($storage_keys as $container_name => $storage_array_key){
+    if (is_array($storage_array_key)){
+        if (array_key_exists($container_name, $job_meta)){
+         $job_meta = array_merge($job_meta,$job_meta[$container_name]); 
+          $storage_keys = array_merge($storage_keys,$storage_keys[$container_name]);
+          unset($job_meta[$container_name]);
+          unset($storage_keys[$container_name]);
+          
+            }
         }
-      echo  formHelper::generateField('trackerend', ['type'=> 'endtracking']);
+    }    
+        $mapped_values = array_intersect_key($job_meta, $storage_keys);
+error_log(print_r($mapped_values,true));
+        if (empty($job_meta)){
+    echo FormHelper::generateVisualSection('job-details-form', ['fields' => $job_fields_template]);
+        } else {
+    FormHelper::generateField('who_cares', ['type' => 'valueinjector','meta_array' => $mapped_values]);
+            echo FormHelper::generateVisualSection('job-details-form', ['fields' => $job_fields_template]);
+    FormHelper::generateField('who_cares', ['type' => 'injectionend']);
+        }
+
         ?>
-    </div>
 <script type="text/javascript">
     document.addEventListener('DOMContentLoaded', function () {
-        var addressData = <?php echo json_encode(get_prepopulated_addresses()); ?>;
+        var addressData = <?php echo json_encode(get_prepopulated_addresses($post_id)); ?>;
         document.getElementById('addresses').addEventListener('change', function () {
             var selectedAddress = this.value;
             if (selectedAddress && addressData[selectedAddress]) {
                 var address = addressData[selectedAddress].data;
-                document.getElementById('address_street_address').value = address['street_address'];
-                document.getElementById('address_street_address_2').value = address['street_address_2'];
+                document.getElementById('street_address').value = address['street_address'];
+                document.getElementById('street_address_2').value = address['street_address_2'];
                 document.getElementById('address_city').value = address['city'];
                 document.getElementById('address_state').value = address['state'];
-                document.getElementById('address_zipcode').value = address['zipcode'];
-                document.getElementById('address_addy_country').value = address['addy_country'];
-                document.getElementById('address_latitude').value = address['latitude'];
-                document.getElementById('address_longitude').value = address['longitude'];
-                document.getElementById('address_google_map_embed').value = address['google_map_embed'];
+                document.getElementById('zipcode').value = address['zipcode'];
+                document.getElementById('addy_country').value = address['addy_country'];
+
             }
         });
     });
-    jQuery(function($) {
-    $('#confirm_add_new_benefit').click(function() {
-        var benefitName = $('#add_new_benefit').val().trim();
+jQuery(function($) {
+    console.log('jQuery document ready function has started.');
+
+    // DEBUG 2: Does jQuery find the button?
+    var myButton = $('#confirm_add_new_benefit');
+    console.log('Button found by jQuery:', myButton);
+    console.log('Number of buttons found:', myButton.length)
+    $('#confirm_add_new_benefit').on('click', function() {
+        const benefitName = $('#add_new_benefit').val().trim();
         if (!benefitName) return;
         $.post(ajaxurl, {
             action: 'add_new_benefit',
             benefit_name: benefitName
-        }, function(response) {
-            if (response.success) {
-                var message = response.data.added ? 'Benefit added' : 'Benefit already exists';
-                alert(message);
-                if (response.data.added) {
-                    var newBenefitHtml = `
-                        <div class="dibraco-checkbox benefits-${response.data.benefit_key}">
-                            <label for="benefits_${response.data.benefit_key}">${response.data.benefit_name}</label>
-                            <input type="hidden" name="benefits_${response.data.benefit_key}" value="0">
-                            <input type="checkbox" id="benefits_${response.data.benefit_key}" data-name="benefits-${response.data.benefit_key}" name="benefits_${response.data.benefit_key}" value="1" checked="">
-                        </div> `;
-                    $('.group-fields .benefits').append(newBenefitHtml);
-                    $('#add_new_benefit').val('');
-                }
-            } else {
-                alert('Error: ' + response.data.message);
+        }, 
+        function(response) {
+            if (!response.success) {
+                alert(response.data.message || 'Error adding benefit');
+                return;
             }
+           const benefitsContainer = $('#benefit');
+            benefitsContainer.append(response.data.benefit_html);
+            $('#add_new_benefit').val('');
+            alert('Benefit added');
         });
     });
 });
 </script>
+</div>
 <?php
 }
 
 function save_job_meta_box_data($post_id) {
- if (!dibraco_verify_post_save_request('dibraco_job_meta_nonce', 'dibraco_save_job_meta')) {return;}
-    $submitted_data = $_POST;
-    $fields_to_save = [];
-    $tracking_started_found = false;
-    $tracking_finished_found = false;
-    foreach ($submitted_data as $fieldname => $value) {
-        if ($fieldname === 'tracking_started') {
-            $tracking_started_found = true;
-        }
-        if ($tracking_started_found && !$tracking_finished_found) {
-            if (substr($fieldname, -9) === 'row_count') {
-                $fields_to_save[$fieldname] = $value;
+    if (!isset($_POST['dibraco_job_meta_nonce']) || !wp_verify_nonce($_POST['dibraco_job_meta_nonce'], 'dibraco_save_job_meta')) {
+        return;
+    }
+    $prepopulated_addresses = get_prepopulated_addresses();
+    $job_fields_template = da_get_job_fields();
+    $all_valid_field_names = dibraco_extract_field_names_helper($job_fields_template);
+   
+    $meta_to_save = [];
+   foreach ($all_valid_field_names as $field_name) {
+       
+
+         if (substr($field_name, -9) === 'row_count') {
+                
+                $meta_to_save[$field_name] = $_POST[$field_name];
                 continue;
             }
-            if (is_array($value)) {
-                $flattened_data = FormProcessor::flatten_array($value, $fieldname);
+            if (is_array($_POST[$field_name])) {
+                $flattened_data = FormProcessor::flatten_array($_POST[$field_name], $field_name);
                 foreach ($flattened_data as $flattened_name => $flattened_value) {
-                    $fields_to_save[$flattened_name] = $flattened_value;
+                    $meta_to_save[$flattened_name] = $flattened_value;
                 }
             } else {
-                $fields_to_save[$fieldname] = $value;
+                $meta_to_save[$field_name] = $_POST[$field_name];
             }
-        }
-        if ($fieldname === 'tracking_finished') {
-            $tracking_finished_found = true;
-            break;
-        }
     }
-    delete_post_meta($post_id, '_job_meta');
-    unset($fields_to_save['tracking_started'], $fields_to_save['tracking_finished'], $fields_to_save['add_new_benefit']);
-    update_post_meta($post_id, '_job_meta', $fields_to_save);
-    $saved_meta = get_post_meta($post_id, '_job_meta', true);
-    $all_fields = da_get_job_fields($post_id);  
-  foreach ($all_fields as $section => $section_config) {
-    foreach ($section_config['fields'] as $field_name => $field_config) {
-        if (isset($field_config['condition'])) {
-            $condition_field = $field_config['condition']['field'];
-            $required_field_values = (array) $field_config['condition']['values'];
-            $condition_field_value = $saved_meta[$condition_field];
-            if (!in_array($condition_field_value, $required_field_values, true)) {
-                $field_type = $field_config['type'];
-                if ($field_type === 'repeater') {
-                    $saved_meta[$field_name . '_row_count'] = 1;
-                    foreach (array_keys($saved_meta) as $key) {
-                        if (preg_match('#^' . preg_quote($field_name) . '\[(?!0\])\d+\]\[.*?\]$#', $key)) {
-                            unset($saved_meta[$key]);
-                        }
-                    }
-                    foreach (array_keys($field_config['fields']) as $subfield) {
-                        $saved_meta["{$field_name}[0][{$subfield}]"] = '';
-                    }
 
-                    continue;
-                }
-                if ($field_type === 'group') {
-                    foreach ($field_config['fields'] as $subfield => $_) {
-                        $meta_key = "{$field_name}_{$subfield}";
-                        $saved_meta[$meta_key] = '';
-                    }
 
-                    continue;
-                }
+    $meta_to_save = dibraco_condition_checker($job_fields_template, $meta_to_save);
 
-                $saved_meta[$field_name] = '';
-            }
-        }
-    }
-}
-    update_post_meta($post_id, '_job_meta', $saved_meta);
-    $post_object = get_post($post_id);
-
-$post_type = $post_object->post_type;
- $valid_through_date_str = $saved_meta['valid_through'];
+    $post_type = get_post_type($post_id);
+    $valid_through_date_str = $meta_to_save['valid_through'];
     $expiration_hook = 'dibraco_expire_job_post_event';
-    wp_clear_scheduled_hook($expiration_hook, array($post_id));
+    wp_clear_scheduled_hook($expiration_hook, [$post_id]);
+
     if (!empty($valid_through_date_str)) {
         $expiration_timestamp = strtotime($valid_through_date_str . ' +1 day');
         $current_timestamp = time();
+
         if ($expiration_timestamp > $current_timestamp) {
-            wp_schedule_single_event($expiration_timestamp, $expiration_hook, array($post_id));
+            wp_schedule_single_event($expiration_timestamp, $expiration_hook, [$post_id]);
+            error_log("save_job_meta_box_data: Scheduled expiration event for post {$post_id} at timestamp {$expiration_timestamp}.");
         } else {
-            if ($post_object->post_status === 'publish') {
-                remove_action("save_post_{$post_type}", 'save_job_meta_box_data', 10);
-                wp_update_post(array(
-                    'ID'          => $post_id,
-                    'post_status' => 'draft',
-                ));
-                add_action("save_post_{$post_type}", 'save_job_meta_box_data', 10, 3);
+            if (get_post_status($post_id) === 'publish') {
+                remove_action("save_post_{$post_type}", 'save_job_meta_box_data', 20);
+                wp_update_post(['ID' => $post_id, 'post_status' => 'draft']);
+                add_action("save_post_{$post_type}", 'save_job_meta_box_data', 20);
+                error_log("save_job_meta_box_data: Expiration date is in the past. Set post {$post_id} to draft.");
             }
         }
     }
+
+    // Save the raw meta data
+    update_post_meta($post_id, '_job_meta', $meta_to_save);
 }
+
+
+/**
+ * The WordPress Cron event callback.
+ */
 function dibraco_execute_job_expiration_action($post_id) {
     $post = get_post($post_id);
-
-    if ($post && $post->post_type === 'job' && $post->post_status === 'publish') {
-        wp_update_post(array(
+    if ($post && $post->post_type === 'jobs' && $post->post_status === 'publish') {
+        wp_update_post([
             'ID'          => $post_id,
             'post_status' => 'draft',
-        ));
+        ]);
     }
 }
-
 add_action('dibraco_expire_job_post_event', 'dibraco_execute_job_expiration_action', 10, 1);
 
 
-function build_job_posting_schema($post_id, $status) {
+function build_job_posting_schema($post_id) {
+   $status = DibracoSchemaEnv::$status;
     $job_data = get_post_meta($post_id, '_job_meta', true);
     $url = get_permalink($post_id);
     $posting_id = $url . '/#jobposting';
@@ -369,7 +367,7 @@ function build_job_posting_schema($post_id, $status) {
     $schema['url'] = $url;
     $schema['title'] = $job_data['job_title'];
     $schema['description'] = extract_description_fields($job_data);
-    $org_stub = _build_organization_stub_node($status);
+    $org_stub = DibracoSchemaEnv::build_organization_stub_node($status);
     $schema['hiringOrganization'] = ['@id' => $org_stub['@id'], '@type' =>'Organization'];
 	if ($job_data['job_location_type'] === 'TELECOMMUTE' || $job_data['job_location_type'] === 'Place_TELECOMMUTE'){
         $schema['jobLocationType'] = 'TELECOMMUTE';  
@@ -549,7 +547,7 @@ function generate_benefits_section($job_data) {
 
 
 function make_job_shortcodes($post_id) {
-    $job_fields = da_get_job_fields($post_id);
+    $job_fields = da_get_job_fields();
     foreach ($job_fields as $section_config) {
         if (empty($section_config['fields'])) {
             continue;

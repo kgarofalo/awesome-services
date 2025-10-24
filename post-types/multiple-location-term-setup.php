@@ -1,212 +1,187 @@
 <?php
 
-function render_location_meta_box($object) {
-    $locations_context = get_option('enabled_connector_contexts')['locations'];
-    $locations_taxonomy = $locations_context['taxonomy'];
-    $location_schema = $locations_context['schema'];
-    $current_location_term_id = '';
-    $current_location_term_name = '';
-    $post_id = get_the_id() ?? null;
-
-    if ($post_id) {
+function render_location_meta_box($term_or_post, $locations_taxonomy) {
+    $connector_contexts = get_option('enabled_connector_contexts');
+    $locations_context= $connector_contexts['locations'];
+    $template_fields =  initialize_dafields('location_');
+    if ($term_or_post instanceof WP_Post){
+        $post_id = $term_or_post->ID;
         $current_location_term_id = dibraco_get_current_term_id_for_post($post_id, $locations_taxonomy);
-        if ($current_location_term_id !== '') {
-            $current_location_term_name = get_term($current_location_term_id)->name;
-        }
-    } elseif (!$post_id) {
-        $term = $object;
-        $current_location_term_id = $term->term_id;
-        $current_location_term_name = $term->name;
+        $all_values = get_term_meta($current_location_term_id);
+        $all_values = array_map('maybe_unserialize', array_map('current', $all_values));
     }
-
-
-    $logo_value = get_term_meta($current_location_term_id, 'location_logo', true);
-    if (empty($logo_value)) {
-        $company_info = get_option('company_info', []);
-        $logo_value = $company_info['company_logo'];
-    }
-
-    $schema_value = get_term_meta($current_location_term_id, 'schema', true);
-    if (empty($schema_value)) {
-        $schema_value = $location_schema;
-    }
-
-    $manager_value = get_term_meta($current_location_term_id, 'location_manager', true);
-    $enabled_context_names = get_option('enabled_context_names', []);
-    
-    // Prepare all section data
-    $prefix = 'location_';
-    $location_sections = initialize_dafields($prefix);
-    $populated_sections = [];
-
-    foreach ($location_sections as $section_key => $section_data) {
-        $populated_section = $section_data; // Make a copy to modify.
-
-        if ($section_key === 'hours_of_operation') {
-            $keys = get_hours_array_keys();
-            $saved_data = get_term_meta($current_location_term_id, 'hours_of_operation', true);
-            
-            // Loop through the definitive list of keys to populate the fields.
-            foreach ($keys as $field_key) {
-                if (isset($populated_section['fields'][$field_key])) {
-                    $populated_section['fields'][$field_key]['value'] = $saved_data[$field_key];
+    elseif (!$term_or_post instanceof WP_Post){
+        $post_id = null;
+        $location_term = $term_or_post;
+        $current_location_term_id = (int)$location_term->term_id;
+        $all_values = get_term_meta($current_location_term_id);
+        $all_values = array_map('maybe_unserialize', array_map('current', $all_values));
+        $current_location_term_name = $location_term->name;
+        $current_location_post_id = $all_values['location_post_id']??'';
+        $current_location_slug = $location_term->slug;
+        if (!empty($current_location_post_id)){
+            $current_location_post_id = (int)$current_location_post_id;
+            $about_enabled = $locations_context['about_section'];
+            $about_location_value ='';
+            if ($about_enabled === '1') {
+                $about_location_value = get_post_meta($current_location_post_id, 'da_about_blurb', true);
                 }
-            }
-
-        } elseif ($section_key === 'social_media') {
-            // Get the definitive list of keys for social media.
-            $keys = get_option('custom_social_media_keys', []);
-            $saved_data = get_term_meta($current_location_term_id, 'social_media', true);
-
-            foreach (array_keys($keys) as $field_key) {
-                if (isset($populated_section['fields'][$field_key])) {
-                    $populated_section['fields'][$field_key]['value'] = $saved_data[$field_key];
+            elseif ($locations_context['dibraco_banner']==="1"){
+                 $about_location_value = get_post_meta($current_location_post_id, 'da_banner_description', true);
                 }
+            $all_values['about_location'] = $about_location_value;
             }
-        } else {
-            foreach ($section_data['fields'] as $field_key => $field_config) {
-                 if (isset($populated_section['fields'][$field_key])) {
-                    $populated_section['fields'][$field_key]['value'] = get_term_meta($current_location_term_id, $field_key, true);
-                }
-            }
-        }
-        
-        $populated_sections[$section_key] = $populated_section;
     }
-
-    ?>
-    <div class="location-term-form">
-        <div id="image-fields" class="dibraco-section">
-            <?php echo FormHelper::generateField('location_logo', ['type' => 'image', 'value' => $logo_value]); ?>
-        </div>
-        <div class='indi-fields'>
-            <?php 
-            echo FormHelper::generateField('schema', ['type' => 'select', 'options' => get_company_schema_types(), 'value' => $schema_value]);
-            if (in_array('employee', $enabled_context_names)) {
-                echo FormHelper::generateField('location_manager', ['type' => 'select', 'options' => get_employee_posts_for_select_options(), 'value' => $manager_value]);
-            }
-            ?>
-        </div>
-        
-        <?php
-        // Now, loop through the prepared data and render the sections.
-        foreach ($populated_sections as $section_key => $section_data) {
-            echo FormHelper::generateVisualSection($section_key, $section_data);
+   if (!$post_id) {
+       $status = get_option('locations_areas_status');
+        if ($status === 'both') {   
+            $area_connector_tax = $connector_contexts['service_areas']['taxonomy'];
+            register_term_meta($locations_taxonomy, 'associated_act_terms', ['type' => 'array', 'single' => false, 'show_in_rest' => ['schema' => ['type' => 'array', 'items' => ['type' => 'integer']]]]);
+            render_area_connection_checkboxes_for_location_terms($location_term, $locations_taxonomy);
         }
+        $related_unique_contexts = $locations_context['related_unique_contexts'];
+        if (!empty($related_unique_contexts)) {
+            render_context_tables($related_unique_contexts, 'unique', $current_location_term_id);
+        }
+        $related_type_contexts = $locations_context['related_type_contexts'];
+        if (!empty($related_type_contexts)) {
+            render_context_tables($related_type_contexts, 'type', $current_location_term_id);
+        }
+    }
+$storage_keys= dibraco_extract_nested_arrays_test($template_fields);
+   error_log(print_r($storage_keys, true)); 
 
-        // Render relationship tables on term screen only.
-        if (!$post_id) {
-            $related_unique_contexts = $locations_context['related_unique_contexts'] ?? [];
-            if (!empty($related_unique_contexts)) {
-                render_context_tables($related_unique_contexts, 'unique', $current_location_term_id);
-            }
-            $related_type_contexts = $locations_context['related_type_contexts'] ?? [];
-            if (!empty($related_type_contexts)) {
-                render_context_tables($related_type_contexts, 'type', $current_location_term_id);
+//echo do_shortcode("[dibraco_location_map loc='$current_location_slug']");
+foreach($storage_keys as $container_name => $storage_array_key){
+        if (is_array($storage_array_key)){
+            if (array_key_exists($container_name, $all_values)){
+              $all_values = array_merge($all_values,$all_values[$container_name]); 
+              $storage_keys = array_merge($storage_keys,$storage_keys[$container_name]);
+              unset($all_values[$container_name]);
+              unset($storage_keys[$container_name]);
             }
         }
-        ?>
-    </div>
-    <?php
+    }    
+        $mapped_values = array_intersect_key($all_values, $storage_keys);
+        FormHelper::generateField('who_cares', ['type' => 'valueinjector', 'meta_array' => $mapped_values]);
+        echo FormHelper::generateVisualSection('location-main-form', ['fields' => $template_fields]);
+        FormHelper::generateField('who_cares', ['type' => 'injectionend']);
 }
 
-
-
-
-function handle_save_location_term_meta($term_id, $taxonomy) {
-
-    $tracking_flag = false;
-    $submitted_data = $_POST;
-    $hours_of_operation_field_keys = get_hours_array_keys();
-    $day_map = get_dibraco_day_map();
-    $social_media_field_keys = get_option('custom_social_media_keys');
-    $meta_to_save = [];
-    $hours_of_operation_data = [];
-    $social_media_data = [];
-    foreach ($submitted_data as $fieldname => $value) {
-        if ($fieldname === 'tracking_started') {
-            $tracking_flag = true;
-            continue;
-        }
-        if (!$tracking_flag) {
-            continue;
-        }
-        if ($fieldname === 'tracking_finished') {
-            break;
-        }
-        if (in_array($fieldname, $hours_of_operation_field_keys)) {
-            $hours_of_operation_data[$fieldname] = $value;
-        } elseif (in_array($fieldname, $social_media_field_keys)) { 
-            $social_media_data[$fieldname] = $value;
-        } else {
-        if ($fieldname !== 'tracking_started' && $fieldname !== 'tracking_finished'  && !str_starts_with($fieldname, 'submit')) {
-                $meta_to_save[$fieldname] = $value;
+function handle_save_location_term_meta($location_term_id, $taxonomy) {
+    $locations_context =get_option('enabled_connector_contexts')['locations'];
+    $about_section = $locations_context['about_section'];
+    $dibraco_banner = $locations_context['dibraco_banner'];
+    $template_fields = initialize_dafields('location_'); 
+    $storage_keys= dibraco_extract_nested_arrays_test($template_fields);
+    
+    $data_to_save = [];
+    $individual_fields =[];
+   foreach ($storage_keys as $container_name => $field_name) {
+         if (!is_array($field_name)) {
+             $individual_fields[$field_name]= $_POST[$field_name];
+         }
+         if (is_array($field_name)){
+             foreach ($field_name as $field_name => $field_value){
+                 $data_to_save[$container_name][$field_name] = $_POST[$field_name];
+               if ($container_name === 'hours_of_operation') {
+                 $hours_of_operation_data = $data_to_save[$container_name];
+                 $day_map = get_dibraco_day_map();
+                    if ($hours_of_operation_data['open_247'] === '1') {
+                    foreach ($day_map as $full_day_name => $abbr) {
+                       $hours_of_operation_data["{$abbr}_open_hour"] = '';
+                       $hours_of_operation_data["{$abbr}_close_hour"] = '';
+                       $hours_of_operation_data["open_{$full_day_name}"] = '1';
+                    }
+                } else if ($hours_of_operation_data['open_247'] !== '1') {
+                        foreach ($day_map as $full_day_name => $abbr) {
+                            if ($hours_of_operation_data["open_{$full_day_name}"] !== '1') {
+                                $hours_of_operation_data["{$abbr}_open_hour"] = '';
+                                $hours_of_operation_data["{$abbr}_close_hour"] = '';
+                                }
+                            }
+                        }
+                    }
+                }
+                update_term_meta($location_term_id, $container_name, $data_to_save[$container_name] );
+                 unset($data_to_save[$container_name]);
             }
-        }
-    }  
-    $linked_post_id = get_term_meta($term_id, 'location_post_id', true);
+    $linked_post_id = get_term_meta($location_term_id, 'location_post_id', true);
     if (!empty($linked_post_id)) {
         $linked_post_id = (int)$linked_post_id;
-        $blurb_value = $meta_to_save['da_about_blurb']; 
-        update_post_meta($linked_post_id, 'da_about_blurb', $blurb_value);
-    }
-    unset($meta_to_save['da_about_blurb']); 
-    if ($hours_of_operation_data['open_247'] === '1') {
-        foreach ($day_map as $full => $abbr) {
-            $hours_of_operation_data["open_{$full}"] = '1';
-            $hours_of_operation_data["{$abbr}_open_hour"] = '';
-            $hours_of_operation_data["{$abbr}_close_hour"] = '';
-        }
-    } else {
-        foreach ($day_map as $full => $abbr) {
-            if ($hours_of_operation_data["open_{$full}"] !== '1') {
-                $hours_of_operation_data["{$abbr}_open_hour"] = '';
-                $hours_of_operation_data["{$abbr}_close_hour"] = '';
+        
+            if ($about_section ==="1"){       
+                update_post_meta($linked_post_id, 'da_about_blurb', $individual_fields['about_location']);
+            } elseif($dibraco_banner ==="1"){
+                update_post_meta($linked_post_id, 'da_banner_description', $individual_fields['about_location']);
             }
+        
+        }
+    unset($individual_fields['about_location']); 
+
+   
+        foreach ($individual_fields as $field_name => $value) {
+            update_term_meta($location_term_id, $field_name, $value);
         }
     }
-    update_term_meta($term_id, 'hours_of_operation', $hours_of_operation_data);
-    update_term_meta($term_id, 'social_media', $social_media_data);
-    foreach ($meta_to_save as $key => $value) {
-        update_term_meta($term_id, $key, $value);
-    }
-    $place_id = $meta_to_save['place_id'];
+    $place_id = $individual_fields['place_id'] ?? '';
     if ($place_id!==''){
         $gmb_url = 'https://www.google.com/maps/place/?q=place_id:' . urlencode($place_id);
-        update_term_meta($term_id, 'gmb_map_link', $gmb_url);
+        update_term_meta($location_term_id, 'gmb_map_link', $gmb_url);
     }
-    $street_address = $meta_to_save['street_address'];
-    $city = $meta_to_save['city'];
-    $state = $meta_to_save['state'];
-    $zipcode = $meta_to_save['zipcode'];
+    
+    $street_address = $individual_fields['street_address'];
+    $city = $individual_fields['city'];
+    $state = $individual_fields['state'];
+    $zipcode = $individual_fields['zipcode'];
+    $location_name = $individual_fields['location_name'];
+    $street_address_2 = $individual_fields['street_address_2'];
+
     $coords_query ='';
     if (!empty($city) && !empty($state)) {
         $geo = get_lat_long_from_osm_2($street_address, $city, $state, $zipcode);
-        if ($geo && isset($geo['lat']) && isset($geo['long'])) {
-            update_term_meta($term_id, 'latitude', $geo['lat']);
-            update_term_meta($term_id, 'longitude', $geo['long']);
+        if ($geo) {
+            $individual_fields['latitude'] = $geo['lat'];
+            $individual_fields['longitude'] = $geo['long'];
+            if (isset($geo['boundingbox'])) {
+                $polygon_json = json_encode($geo['boundingbox']);
+                update_term_meta($location_term_id,'bounding_box', $polygon_json);
+            }
             $coords_query = $geo['lat'] . ',' . $geo['long'];
         }
     }
-    if (!empty( $meta_to_save['street_address_2'])){
-        $street_address = "{$street_address} {$meta_to_save['street_address_2']}";
+    if (!empty($street_address_2)){
+        $street_address = "{$street_address} {$street_address_2}";
     }
-    $address_query = implode(', ', array_filter([$meta_to_save['location_name'], $street_address, $city, $state, $zipcode]));
+    $location_name = $individual_fields['location_name'];
+    $address_query = implode(', ', array_filter([$location_name, $street_address, $city, $state, $zipcode]));
     $base_url = 'https://maps.google.com/maps?q=' . urlencode($address_query);
     $normal_url = $base_url . '&z=14';
-    update_term_meta($term_id, 'normal_map', $normal_url);
+    update_term_meta($location_term_id, 'normal_map', $normal_url);
+    $extracted_place_id = '';
+        $embed_temp_frame = $normal_url . '&output=embed';
+        $response = wp_remote_get($embed_temp_frame);
+        if (!is_wp_error($response)) {
+            $body = wp_remote_retrieve_body($response);
+
+    if (preg_match('/"(ChIJ[a-zA-Z0-9_-]+)"/', $body, $matches)) {
+                $extracted_place_id = $matches[1];
+                update_term_meta($location_term_id, 'place_id', $extracted_place_id);
+            }
+        }
+    
     if (empty($place_id)){
-        update_term_meta($term_id, 'gmb_map_link', $normal_url);
+        update_term_meta($location_term_id, 'gmb_map_link', $normal_url);
     }
     if ($coords_query !== '') {
         $streetview_params = ['q'=>$address_query,'cbll'=>$coords_query,'cbp'=>'12,235,,0,5','layer'=>'c','output'=>'svembed'];
-        $street_url = 'https://maps.google.com/maps?q=' . http_build_query($streetview_params);
+        $street_url = 'https://maps.google.com/maps?' . http_build_query($streetview_params);
     }
-    update_term_meta($term_id, 'street_map', $street_url);
-	$location_term = get_term($term_id);
-	$kml_content = generate_custom_kml_file([$term_id], esc_html($location_term->name));
-    error_log($kml_content);
-    update_term_meta($term_id, 'kml_content', $kml_content);
+    update_term_meta($location_term_id, 'street_map', $street_url);
+    $location_term = get_term($location_term_id);
+    $location_term_name = $location_term->name;
+    $kml_content = generate_custom_kml_file([$location_term_id], $location_term_name);
+    update_term_meta($location_term_id, 'kml_content', $kml_content);
 }
 
 
@@ -244,41 +219,50 @@ function render_all_terms($taxonomy, $meta_key, $mode) {
 }
 function generate_connector_term_links($term, $meta_target) {
     $term_url = get_term_meta($term->term_id, $meta_target, true);
-    $current_url = get_permalink(get_the_ID());
-    if ($term_url && trailingslashit($term_url) !== trailingslashit($current_url)) {
-        return "<a href='" . esc_url($term_url) . "'>" . esc_html($term->name) . "</a>";
+    $term_post_id = get_term_meta($term->term_id, $meta_target . '_post_id', true);
+    $current_post_id = get_the_ID();
+    if ($current_post_id == $term_post_id) {
+        return $term->name; 
     }
-    return esc_html($term->name);
+    return "<a href='" . $term_url . "'>" . $term->name . "</a>";
 }
 function render_combined_mode($location_tax, $service_area_tax, $mode) {
     $post_id = get_the_ID();
     $location_term_id = da_get_location_term_or_default($post_id);
     if ($location_term_id) {
-        return render_location_specific($location_term_id, $location_tax, $service_area_tax, $mode);
+        return render_location_specific($post_id, $location_term_id, $location_tax, $service_area_tax, $mode);
     }
-    return render_global_combined($location_tax, $service_area_tax, $mode);
+    return render_global_combined($post_id, $location_tax, $service_area_tax, $mode);
 }
-
-function render_location_specific($location_term_id, $location_tax, $service_area_tax, $mode) {
-    $assignments = get_option('act_to_lct_assignments', []);
-    $associated_ids = [];
-    foreach ($assignments as $area_id => $assigned_location_id) {
-        if ((int)$assigned_location_id === (int)$location_term_id) {
-            $associated_ids[] = (int)$area_id;
+function render_location_specific($post_id, $location_term_id, $location_tax, $service_area_tax, $mode) {
+    $location_term_id = (int)$location_term_id;
+    $location_term_name = get_term($location_term_id)->name;
+    $assigned_act_term_ids = get_term_meta($location_term_id, 'associated_act_terms', true);
+    if (empty($assigned_act_term_ids)) {
+        return render_global_combined($post_id, $location_tax, $service_area_tax, $mode);
+    }
+    $area_term_id = dibraco_get_current_term_id_for_post($post_id, $service_area_tax);
+    if (!empty($area_term_id)) {
+        $area_term_id = (int)$area_term_id;
+    }
+    $service_area_links = [];
+    foreach ($assigned_act_term_ids as $assigned_act_term_id) {
+        $assigned_act_term_id = (int)$assigned_act_term_id;
+        $term_name = get_term($assigned_act_term_id)->name;
+        if ($assigned_act_term_id === $area_term_id) {
+            $service_area_links[] = $term_name; 
+        } else {
+            $service_area_post_url = get_term_meta($assigned_act_term_id, 'service_area_link_url', true);
+            if (empty($service_area_post_url)) {
+                $service_area_links[] = $term_name; 
+            } else{
+                $service_area_links[] = "<a href='{$service_area_post_url}'>{$term_name}</a>";
+            }
         }
     }
-
-    if (empty($associated_ids)) {
-        return render_global_combined($location_tax, $service_area_tax, $mode);
-    }
-
-    $service_area_links = [];
-    foreach ($associated_ids as $id) {
-        $term = get_term($id, $service_area_tax);
-        $service_area_links[] = generate_connector_term_links($term, 'service_area_link_url');
-    }
-    $location_term = get_term($location_term_id, $location_tax);
-    $location_link = generate_connector_term_links($location_term, 'location_link_url');
+    
+    $location_link_url =  get_term_meta($location_term_id, 'location_link_url', true);
+    $location_link = "<a href='{$location_link_url}'>{$location_term_name}</a>";
     $final_links = [];
     shuffle($service_area_links);
     if ($mode === 'list') {
@@ -289,7 +273,7 @@ function render_location_specific($location_term_id, $location_tax, $service_are
     return format_links_output($final_links, $mode);
 }
 
-function render_global_combined($location_tax, $service_area_tax, $mode) {
+function render_global_combined($post_id, $location_tax, $service_area_tax, $mode) {
     $max_total_items = 20;
     $locations = get_terms(['taxonomy' => $location_tax, 'hide_empty' => true]);
     $location_links = [];
@@ -320,7 +304,49 @@ shuffle($service_area_links);
     }
     return format_links_output($final_links, $mode);
 }
+function format_service_area_sentence($current_area_name, $other_area_links, $location_name, $location_link, $is_service_area_page = false) {
+    $location_fronts = [
+        "We provide service in {location_name}",
+        "Our service area includes {location_name}",
+        "From our {location_name} office, we serve",
+        "We proudly serve {location_name}"
+    ];
+    $service_area_fronts = [
+        "We provide service in {current_area_name}",
+        "Our services are available in {current_area_name}",
+        "We proudly serve the {current_area_name} area",
+        "Our team regularly works in {current_area_name}"
+    ];
+    $ends = [
+        "and other areas we serve from our {location_link} location.",
+        "as well as many nearby communities from our location in {location_link}.",
+        "plus surrounding areas, all serviced by our {location_link} location.",
+        "and the surrounding region from our central {location_link} location."
+    ];
 
+    shuffle($other_area_links);
+    $other_area_links = array_slice($other_area_links, 0, 10);
+    $other_areas_string = implode(", ", $other_area_links);
+
+    $output = '';
+    if ($is_service_area_page) {
+        $front_phrase = $service_area_fronts[array_rand($service_area_fronts)];
+        $output = str_replace('{current_area_name}', $current_area_name, $front_phrase);
+
+    } else { 
+        $front_phrase = $location_fronts[array_rand($location_fronts)];
+        $output = str_replace('{location_name}', $location_name, $front_phrase);
+    }
+    
+    if (!empty($other_areas_string)) {
+        $output .= ", " . $other_areas_string;
+    }
+
+    $end_phrase = $ends[array_rand($ends)];
+    $output .= " " . str_replace('{location_link}', $location_link, $end_phrase);
+
+    return $output;
+}
 function format_links_output($links, $mode = 'comma') {
     if ($mode === 'list') {
         $html = '<div class="marketcitylist"><ul>';
@@ -345,9 +371,11 @@ function da_get_location_term_or_default($post_id, $extra_data = '', $location_s
 	}
 	$connector_contexts = get_option('enabled_connector_contexts');
 	$location_tax = $connector_contexts['locations']['taxonomy'];
+	$company_info = get_option('company_info');
+    $show_address_on_org = $company_info['show_address_on_org'];
     $service_area_tax = ''; 
 	if ($status === 'both'){
-	$service_area_tax = $connector_contexts['service_areas']['taxonomy'];
+	    $service_area_tax = $connector_contexts['service_areas']['taxonomy'];
     }
 	if ($location_slug) {
 		$term = get_term_by('slug', $location_slug, $location_tax);
@@ -375,30 +403,60 @@ function da_get_location_term_or_default($post_id, $extra_data = '', $location_s
 			 return ['area_term_id' => $area_term_id, 'location_term_id' => $location_term_id];
 		    }
 		    else return $location_term_id;
+	        }
 	    }
-	    }
+	}
+	if ($show_address_on_org ==="0"){
+        $default_term_id = $company_info['default_term'];
+        return $default_term_id;
 	}
 	return null;
 }
 function register_dynamic_social_media_link_shortcodes() {
-    $social_keys = get_option('custom_social_media_keys'); 
-    foreach ($social_keys as $key) {
-        add_shortcode($key . '_link', function($atts) use ($key) {
-            $atts = shortcode_atts(['extra_data'=> '', 'loc' => ''], $atts);
-            $location_slug = $atts['loc'];
-            $extra_data = $atts['extra_data'];
-            $post_id = get_the_ID();
-            $link = ''; 
-            $location_term_id = da_get_location_term_or_default($post_id, $extra_data, $location_slug);
-            if ($location_term_id) {
-               $term_social_media_data = get_term_meta($location_term_id, 'social_media', true) ?? [];
-               $link = $term_social_media_data[$key] ?? ''; 
-            }
-             if (empty($link)) {
-                  $options = get_option('company_info');
-                $company_social_media_data = $options['social_media'] ?? []; 
-                $link = $company_social_media_data[$key] ?? '';
+   $social_fields = get_social_media_fields();
+   $social_media_fields = array_keys($social_fields);
+   $status = get_option('locations_areas_status');
+   $post_id = get_the_ID();
+   $location_term_id ='';
+   if ($status === 'both'){
+   		$connector_contexts = get_option('enabled_connector_contexts');
+       	$location_tax = $connector_contexts['locations']['taxonomy'];
+        $service_area_tax = $connector_contexts['service_areas']['taxonomy'];
+    	$area_term_id = dibraco_get_current_term_id_for_post($post_id, $service_area_tax);
+        if ($area_term_id !=='') {
+		    $location_term_id = get_term_meta($area_term_id, 'area_parent_location_term', true);
         }
+        if ($location_term_id ===''){
+        	$location_term_id = dibraco_get_current_term_id_for_post($post_id, $location_tax);
+        }
+   }
+ 	if ($status === 'multi_locations'){
+		$connector_contexts = get_option('enabled_connector_contexts');
+    	$location_tax = $connector_contexts['locations']['taxonomy'];
+    	$location_term_id = dibraco_get_current_term_id_for_post($post_id, $location_tax);
+    }
+    foreach ($social_media_fields as $social_media_field) {
+        add_shortcode($social_media_field . '_link', function($atts) use ($social_media_field, $location_term_id) {
+            $atts = shortcode_atts(['loc' => ''], $atts);
+            $location_slug = $atts['loc'];
+            if ($location_slug !==''){
+        	    $location_tax = $connector_contexts['locations']['taxonomy']??'';
+                $term = get_term_by('slug', $location_slug, $location_tax);
+	    	    if ($term && !is_wp_error($term)) {
+		         $location_term_id = $term->term_id;
+	    	    }
+            }
+            $link = ''; 
+            if ($location_term_id !=='') {
+                $term_social_media_data = get_term_meta($location_term_id, 'social_media', true);
+               if (!empty($term_social_media_fields)){
+                    $link = $term_social_media_data[$social_media_field]; 
+                }
+            }
+            if ($link ==='') {
+                $comapany_social_media_fields = get_option('company_info')['social_media'];
+                $link = $comapany_social_media_fields[$social_media_field];
+            }
         return $link;
     });
 }
@@ -527,61 +585,42 @@ function da_logo_url_shortcode($atts) {
 }
 add_shortcode('da_logo_url', 'da_logo_url_shortcode');
 
-function da_get_address_data($location_term_id = '') {
-    $address_keys = ['street_address', 'street_address_2', 'city', 'state', 'zipcode', 'addy_country'];
-    $address_parts = [];
-    if (!empty($location_term_id)) {
-        foreach ($address_keys as $key) {
-            $address_parts[$key] = get_term_meta($location_term_id, $key, true);
-        }
-          $validation_fields = [
-            $address_parts['street_address'],
-            $address_parts['city'],
-            $address_parts['state']
-        ];
-        $valid_field_count = count(array_filter($validation_fields));
-        if ($valid_field_count < 2) {
-            $location_term_id = '';
-        }
-    }
-    if (empty($location_term_id)) {
-        $company_info = get_option('company_info');
-        foreach ($address_keys as $key) {
-            $address_parts[$key] = $company_info[$key];
-        }
-    }
-    return $address_parts;
-}
-
 function da_address_shortcode($atts) {
     $atts = shortcode_atts(['extra_data'=> '', 'loc' => '', 'country' => ''], $atts);
     $location_slug = $atts['loc'];
     $extra_data = $atts['extra_data'];
     $post_id = get_the_ID();
+    $address_keys = ['street_address', 'street_address_2', 'city', 'state', 'zipcode', 'addy_country'];
+    if ($atts['country'] !== 'yes'){
+     $address_keys = ['street_address', 'street_address_2', 'city', 'state', 'zipcode'];
+    }
     $location_term_id = da_get_location_term_or_default($post_id, $extra_data, $location_slug);
-    $parts = da_get_address_data($location_term_id);
-    $output = '';
-    if (!empty($parts['street_address'])) {
-        if (!empty($parts['street_address_2']) && strlen($parts['street_address_2']) < 10) {
-            $output .= $parts['street_address'] . ' ' . $parts['street_address_2'] . '<br>';
-        } else {
-            $output .= $parts['street_address'] . '<br>';
-            if (!empty($parts['street_address_2'])) {
-                $output .= $parts['street_address_2'] . '<br>';
-            }
+    $address_parts=[];
+    if ($location_term_id) {
+        foreach ($address_keys as $address_field) {
+            $address_parts[$address_field] = get_term_meta($location_term_id, $address_field, true);
         }
     }
-    if (!empty($parts['city']) && !empty($parts['state'])) {
-        $output .= $parts['city'] . ', ' . $parts['state'];
-        if (!empty($parts['zipcode'])) {
-            $output .= ' ' . $parts['zipcode'];
+    if (!$location_term_id) {
+        $company_info = get_option('company_info');
+        foreach ($address_keys as $address_field) {
+            $address_parts[$address_field] = $company_info[$address_field];
         }
-        $output .= '<br>';
     }
-    if ($atts['country'] === 'yes' && !empty($parts['addy_country'])) {
-        $output .= $parts['addy_country'];
+    $street_address = $address_parts['street_address'];
+    $street_address_2 = $address_parts['street_address_2'];
+    $city = $address_parts['city'];
+    $state = $address_parts['state'];
+    $zipcode = $address_parts['zipcode'];
+    $country = $address_parts['addy_country']??'';
+    $address = "{$street_address}";
+    if (!empty($street_address_2) && strlen($street_address_2) < 10) {
+        $address = "{$street_address} {$street_address_2}";
+    } elseif (!empty($street_address_2) && strlen($street_address_2) > 10){
+        $address .= "<br>{$street_address_2}";
     }
-    return $output; 
+    $address .= "<br>{$city}, {$state} {$zipcode} {$country}";
+    return $address;
 }
 add_shortcode('da_address', 'da_address_shortcode');
 
@@ -684,7 +723,7 @@ function display_email_field($atts) {
     $atts = shortcode_atts(['extra_data'=> '', 'loc' => ''], $atts);
     $location_slug = $atts['loc'];
     $extra_data = $atts['extra_data'];
-    $location_term_id = $post_id = get_the_ID();     
+    $post_id = get_the_ID();     
     $location_term_id = da_get_location_term_or_default($post_id, $extra_data, $location_slug);
     $email_field = '';
     if ($location_term_id) {
