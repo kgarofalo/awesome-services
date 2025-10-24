@@ -33,16 +33,29 @@ jQuery(document).ready(function ($) {
             $hex8Input.val(hex8);
             $colorInput.closest('.wp-picker-container').find('.wp-color-result').css('background-color', color);
             $slider.css('background-color', color); 
+            $fakeBtn.css('background-color', color); // ← Update fake button
         }
 
-        setTimeout(function() {
-            $colorInput.wpColorPicker({ change: updateHex8 });
-            updateHex8(); 
-
-            var $container = $colorInput.closest('.wp-picker-container');
+           setTimeout(function() {
+            $colorInput.wpColorPicker({ 
+                change: updateHex8,
+                defaultColor: false,
+                clear: false
+            });
+            updateHex8()
+            
+             var $container = $colorInput.closest('.wp-picker-container');
+            
+            // Hide WordPress's button, keep only fake button
+            $container.find('.wp-color-result').hide();
+            $container.find('.wp-picker-default, .wp-picker-clear').remove();
+            
+            // Open the picker
             $container.find('.wp-color-result').trigger('click');
-
+            
             setTimeout(function(){
+                $container.find('.wp-picker-default, .wp-picker-clear').remove();
+                
                 var $irisInner = $container.find('.iris-picker-inner');
                 if ($irisInner.length && $irisInner.find($slider).length === 0) {
                     $irisInner.append($slider);
