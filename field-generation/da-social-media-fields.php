@@ -1,68 +1,63 @@
 <?php
 function get_social_media_fields() {
-	$option_key = 'custom_social_media_keys';
-	$all_keys = get_option($option_key, []);
-    if (!isset($all_keys['facebook'])) {
-		$default_keys = ['facebook', 'gmb', 'yelp', 'instagram', 'twitter', 'bbb', 'linkedin'];
-		$all_keys = array_merge(array_combine($default_keys, $default_keys), $all_keys);
-		update_option($option_key, $all_keys);
-	} 
-	$special_labels = ['gmb' => 'Google My Business', 'bbb' => 'BBB', 'linkedin' => 'LinkedIn'];
-	$formatted_fields = [];
-	foreach ($all_keys as $key => $value) {
-		$field_definition = ['type' => 'text'];
-		if (isset($special_labels[$key])) {
-			$field_definition['label'] = $special_labels[$key];
-		}
-		$formatted_fields[$key] = $field_definition;
+	$field_names = get_option('custom_social_media_keys', []);
+	if (empty($field_names)){
+	    $field_names = ['facebook', 'gmb', 'yelp', 'instagram', 'twitter', 'bbb', 'linkedin'];
 	}
-	return $formatted_fields;
+$special_labels = ['gmb' => 'Google Business Profile', 'bbb' => 'BBB', 'linkedin' => 'LinkedIn'];
+ $fields = [];
+    foreach ($field_names as $field_name) {
+        $field_config = ['type' => 'text'];
+        if (isset($special_labels[$field_name])) {
+            $field_config['label'] = $special_labels[$field_name];
+        }
+       $fields[$field_name] = $field_config;
+    }
+    return $fields;
 }
+
+
 function render_social_media_options_page() {
-	if (!current_user_can('manage_options')) {
-		return;
-	}
-	$non_deletable_keys = ['facebook', 'gmb', 'yelp', 'instagram', 'twitter', 'bbb', 'linkedin'];
-	$all_keys = get_option('custom_social_media_keys', []);
-	if (isset($_POST['submit']) && !empty(trim($_POST['custom_social_media_field_label']))) {
-		$raw_input = trim($_POST['custom_social_media_field_label']);
-		$clean_input = strtolower(sanitize_text_field($raw_input));
-		$new_field_key = str_replace(' ', '_', $clean_input);
-		if ($new_field_key && !array_key_exists($new_field_key, $all_keys)) {
-			$all_keys[$new_field_key] = $new_field_key;
-			update_option($option_key, $all_keys);
-		}
-	}
-	if (isset($_POST['delete_field_key'])) {
-		$key_to_delete = $_POST['delete_field_key'];
-		unset($all_keys[$key_to_delete]);
-		update_option($option_key, $all_keys);
-	}
-	?>
-	<div class="wrap">
-		<h1>Manage Social Media Fields</h1>
-		<?php settings_errors('social_media_fields'); ?>
-		<h2>Add New Field</h2>
-		<form method="post" style="width:30%">
-			<?php echo FormHelper::generateField('custom_social_media_field_label', ['type' => 'text', 'label' => 'New Social Media Property']); ?>
-			<?php submit_button('Add New Field'); ?>
-		</form>
-		<hr>
-		<h2>All Social Media Fields</h2>
-		<form method="post">
-			<ul>
-				<?php foreach ($all_keys as $key => $value): ?>
-					<li>
-						<?php echo esc_html(ucwords(str_replace('_', ' ', $key))); ?>
-						<?php if (!in_array($key, $non_deletable_keys)): ?>
-							<button type="submit" name="delete_field_key" value="<?php echo esc_attr($key); ?>" class="button button-secondary button-small" style="margin-left: 10px;">
-								Delete
-							</button>
-						<?php endif; ?>
-					</li>
-				<?php endforeach; ?>
-			</ul>
-		</form>
-	</div>
-	<?php
+    $option_key = 'custom_social_media_keys';
+
+    $field_names = get_option($option_key, []);
+    if (empty($field_names)) {
+        $field_names = ['facebook', 'gmb', 'yelp', 'instagram', 'twitter', 'bbb', 'linkedin'];
+    }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+       if (isset($_POST['add'])) {
+        $new_field_name = strtolower(str_replace(' ', '_', sanitize_text_field($_POST['new_social_media_field'])));
+        if (($new_field_name !== '') && (!in_array($new_field_name, $field_names))) {
+                $field_names[$new_field_name] = $new_field_name;
+            }
+        }
+       if (isset($_POST['delete'])) {
+                unset($field_names[$_POST['delete']]);
+            }
+        update_option($option_key, $field_names);
+    }
+    ?>
+    <div class="wrap">
+        <h1>Manage Social Media Fields</h1>
+        <form method="post">
+            <h2>Add New Field</h2>
+            <?= FormHelper::generateField('new_social_media_field', ['type' => 'text']); ?>
+            <button type="submit" name="add" value="new_social_media_field" class="button button-primary">Add New Field</button>
+
+            <hr>
+            <h2>All Social Media Fields</h2>
+            <ul>
+                <? foreach ($field_names as $field_name){
+                    $printed = ucwords(str_replace('_', ' ',  $field_name));
+                    echo "<li>$printed";
+                            echo "<button type=submit name=delete value={$field_name} class=button button-secondary button-small style=margin-left:10px> Delete </button>";
+                    echo "</li>";    
+                }
+               ?>
+            </ul>
+        </form>
+    </div>
+    <?php
 }
+
+

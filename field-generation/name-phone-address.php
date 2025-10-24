@@ -1,8 +1,6 @@
 <?php
-function get_contact_info_fields($prefix='') {
-  if ($prefix===''){
-      $prefix = null;
-  }
+
+function get_contact_info_fields($prefix=null) {
   return [
     "{$prefix}name" => ['type' => 'text'],
     "phone_number" => ['type' => 'text'], 
@@ -10,101 +8,143 @@ function get_contact_info_fields($prefix='') {
     "fax_number" => ['type' => 'text'],
     "place_id" => ['type' => 'text'],
     "gmb_map_link" => ['type' => 'text'],
-    "second_phone" => ['type' => 'toggle', 'label' => 'Second Phone?', 'options_label' => ["0" => 'Yes', "1" => 'No'], 'value' => "0"],
+    "second_phone" => ['type' => 'toggle', 'label' => 'Second Phone?', 'options_label' => ["0" => 'Yes', "1" => 'No'], 'value' => "1"],
     "additional_phone" => ['type' => 'text', 'condition' => ['field' => 'second_phone', 'values' => ["1"]]],
-    "exterior_image" => ['type' => 'image'],
   ];
 }
 
+function get_location_or_company_image_fields($prefix=null){
+    if ($prefix){
+     return['location_logo'=> ['type' => 'image'],
+      'exterior_image' => ['type'=>'image']];
+    }
+return['company_logo' =>['type' => 'image'],
+        'map_pin' =>  ['type' => 'image'],
+        'exterior_image' => ['type'=>'image'],
+         ];
+}
+function get_location_only_fields($schema_options) {
+  $fields = [
+      'schema' => ['type'=>'select','options'=>$schema_options],
+      'about_location' => ['type'=>'textarea','value'=>''],
+      'price_range' => ['type'=>'text','value'=>'$$'],
+      'payment_accepted' => ['type'=>'text','value'=>'Cash, Credit Card'],
+      'map_pin' =>  ['type' => 'image'],
+  ];
+  if (in_array('employee', get_option('enabled_context_names'))) {
+      $fields = $fields + ['location_manager' => ['type'=>'select','options'=>get_employee_posts_for_select_options()]];
+  }
+  return $fields;
+}
+function get_company_info_only_fields($schema_options) {
+  $page_options = get_pages_for_contact_about();
+    $fields=  [
+         'legal_name' => ['label'=> 'Legal Name', 'type' => 'text'],
+         'founding_date' => ['label'=> 'Company Founding Date', 'type' => 'date'],
+         'schema' => ['type' => 'select', 'options' => $schema_options],
+         'about_page' => ['type' => 'select', 'options' => $page_options],
+         'contact_page' =>['type' => 'select', 'options' => $page_options],
+         'non_profit_status'  => ['label' => 'Non Profit?', 'type'  => 'toggle', 'value' => "0"],
+         'non_profit_type' => ['label'=> 'Non Profit Type', 'type' => 'select', 'options' => get_non_profit_type(), 'condition' => ['field' => 'non_profit_status', 'values' => ["1"]]],
+         'company_description' => ['type'=>'textarea'],
+         'show_address_on_org' => ['type' => 'toggle', 'value'=> '1', 'options_label' => ['1' => 'No', '0'=> 'Yes']],
+         'generate_schema'  => ['label' => 'Generate Schema?', 'type'  => 'toggle', 'value' => "0"],
+      ];
+     $show_address_on_org = get_option('company_info')['show_address_on_org'] ??"1";
+     if ($show_address_on_org ==='0'){
+      $status = get_option('areas_locations_status',[]); 
+      if ($status !=='multi_areas' && $status !== 'none'){
+          $locations_taxonomy = get_option('enabled_connector_contexts')['locations']['taxonomy'];
+          $location_terms = getTermOptions($locations_taxonomy);
+          $fields = $fields += ['default_term' => ['type'=>'select','options'=>$location_terms, 'condition' => ['field' => 'show_address_on_org', 'values' => ["0"], 'current_value' => ''],]];
+          return $fields;
+        } elseif($status ==='multi_areas'){
+            $service_area_taxonomy = get_option('enabled_connector_contexts')['service_areas']['taxonomy'];
+            $service_area_terms = getTermOptions($service_area_taxonomy);
+            $fields = $fields += ['default_term' => ['type'=>'select','options'=>$service_area_terms, 'condition' => ['field' => 'show_address_on_org', 'values' => ["0"], 'current_value' => ''],]];
+            return $fields;
+          } else {
+              return $fields;
+          }
+     }
+     return $fields;
+  }
 
 function get_address_fields() {
   return [
-    "street_address"    => ['type' => 'text'],
+    "street_address" => ['type' => 'text'],
     "street_address_2"  => ['type' => 'text'],
-    "city"              => ['type' => 'text'],
-    "state"             => ['type' => 'text'],
-    "zipcode"           => ['type' => 'text'],
-    "addy_country"      => ['type' => 'text', 'label' => 'Country'],
-    "latitude"          => ['type' => 'text'],
-    "longitude"         => ['type' => 'text'],
+    "city" => ['type' => 'text'],
+    "state" => ['type' => 'text'],
+    "zipcode" => ['type' => 'text'],
+    "addy_country" => ['type' => 'text', 'label' => 'Country'],
+    "latitude" => ['type' => 'text'],
+    "longitude" => ['type' => 'text'],
+    "bounding_box" => ['type' => 'text'], 
     "normal_map" => ['type' => 'text'],
     "street_map" => ['type' => 'text'],
   ];
 }
-
-  
-function get_landscape_image_fields($context_type ='') {
-     $fields = [];
-     for ($i = 1; $i <= 2; $i++) {
-        $fields["dibraco_landscape_{$i}"] = ['type'  => 'image', 'label' => "Landscape Image {$i}" ];
-    if ($context_type !== 'unique') {
-        $fields["dibraco_landscape_{$i}_lock"] = ['type'  => 'toggle', 'label' => 'Lock Image', 'options_label' => ["0" => 'Locked', "1" => 'Unlocked']];
-        }
-    }
-    return $fields;
-}
-
-function get_portrait_image_fields($context_type = '') {
-   $fields = [];
-     for ($i = 1; $i <= 2; $i++) {
-        $fields["dibraco_portrait_{$i}"] = ['type'  => 'image', 'label' => "Portrait Image {$i}" ];
-    if ($context_type !== 'unique') {
-        $fields["dibraco_portrait_{$i}_lock"] = ['type'  => 'toggle', 'label' => 'Lock Image'];
-        }
-    }
-    return $fields;
-}
 function get_service_area_term_fields (){
-$fields =[];
-        $fields['city'] = ['type' => 'text'];
-        $fields['state']       = ['type' => 'text'];
-        $fields['latitude']    = ['type' => 'text'];
-        $fields['longitude']   = ['type' => 'text'];
-return $fields;
+return [
+    'city' => ['type' => 'text'],
+    'state' =>['type' => 'text'],
+    'latitude' => ['type' => 'text'],
+    'longitude' => ['type' => 'text'],
+    'bounding_box' => ['type' => 'text'],
+    ];
 }
+ 
 function get_banner_fields(){
     return  [
-    'da_main_h1'            => ['label' => 'Main H1', 'type' => 'text'],
-    'da_banner_description' => ['label' => 'Banner Description', 'type' => 'wysiwyg', 'wpautop' => false, 'media_buttons' => true, 'teeny' => false, 'rows' => 7],
+    'da_main_h1'            => ['label' => 'Main H1', 'type' => 'text', 'pair' => '1'],
+    'da_banner_description' => ['label' => 'Banner Description', 'type' => 'wysiwyg', 'pair_end' => '1'],
 ];
 }
 function get_contact_fields(){
 return [
-    'da_quote_title'        => ['label' => 'Quote Title', 'type' => 'text'],
-    'da_contact_section'    => ['label' => 'Contact Section', 'type' => 'wysiwyg', 'wpautop' => false, 'media_buttons' => false, 'teeny' => false, 'rows' => 7],
+    'da_quote_title' => ['label' => 'Quote Title', 'type' => 'text', 'pair' => '1'],
+    'da_contact_section' => ['label' => 'Contact Section', 'type' => 'wysiwyg', 'pair_end' => '1'],
 ];
 }
 function get_about_fields(){
   return[
-    'da_about_title' =>['type' => 'text', 'label' => 'About Title'],
-    'da_about_blurb' => ['type' => 'wysiwyg', 'label' => 'About Blurb', 'wpautop' => false, 'media_buttons' => true, 'teeny' => false, 'rows' => 7],
-    'da_commercial_title' =>['type' => 'text', 'label' => 'Commercial Title'],
-    'da_commercial_section' => ['type' => 'wysiwyg', 'label' => 'Commercial Section', 'wpautop' => false, 'media_buttons' => true, 'teeny' => false, 'rows' => 7]
+    'da_about_title' =>['type' => 'text', 'label' => 'About Title', 'pair' => '1'],
+    'da_about_blurb' => ['type' => 'wysiwyg', 'label' => 'About Blurb','pair_end'=>'1'],
+    ];
+}
+function get_commercial_fields(){
+     return[
+     'da_commercial_title' =>['type' => 'text', 'label' => 'Commercial Title', 'pair' => '1'],
+     'da_commercial_section' => ['type' => 'wysiwyg', 'label' => 'Commercial Section','pair_end'=>'1']
     ];
 }
 
 function get_section_title_fields() {
-    $fields = [];
-    $fields['da_section_1_title'] = ['label' => 'Section 1 Title', 'type' => 'text'];
-    $fields['da_section_1_p']     = ['label' => 'Section 1 Paragraph', 'type' => 'wysiwyg', 'wpautop' => false, 'media_buttons' => true, 'teeny' => false, 'rows' => 7];
-    $fields['da_section_2_title'] = ['label' => 'Section 2 Title', 'type' => 'text'];
-    $fields['da_section_2_p']     = ['label' => 'Section 2 Paragraph', 'type' => 'wysiwyg', 'wpautop' => false, 'media_buttons' => true, 'teeny' => false, 'rows' => 7];
-    $fields['da_section_3_title'] = ['label' => 'Section 3 Title', 'type' => 'text'];
-    $fields['da_section_3_p']     = ['label' => 'Section 3 Paragraph', 'type' => 'wysiwyg', 'wpautop' => false, 'media_buttons' => true, 'teeny' => false, 'rows' => 7];
-    return $fields;
-}
-function get_repeater_field_list(){
-$fields = [
-        'da_list_title' => ['label' => 'List Title', 'type' => 'text'],
-        'da_list_repeater' => ['type' => 'repeater', 'fields' => ['item' => ['type' => 'textarea', 'label'=> 'item', 'rows' => 2 ]]]
+    return [
+    'da_section_1_title' => ['label' => 'Section 1 Title', 'type' => 'text', 'pair' => '1'],
+    'da_section_1_p'=> ['label' => 'Section 1 Paragraph', 'type' => 'wysiwyg', 'pair_end'=>'1'],
+    'da_section_2_title'=> ['label' => 'Section 2 Title', 'type' => 'text', 'pair' => '1'],
+    'da_section_2_p'=> ['label' => 'Section 2 Paragraph', 'type' => 'wysiwyg', 'pair_end'=>'1'],
+    'da_section_3_title'=> ['label' => 'Section 3 Title', 'type' => 'text', 'pair' => '1'],
+    'da_section_3_p'=> ['label' => 'Section 3 Paragraph', 'type' => 'wysiwyg', 'pair_end'=>'1'],
     ];
- return $fields;
 }
 
-function get_employee_fields($has_certification ="0"){
+function get_repeater_field_list(){
+ return [
+        'da_list_title' => ['type' => 'text', 'label' => 'List Title', 'pair' => '1'], 
+        'da_list_repeater' => ['type' => 'repeater', 'fields' => [ 
+            'item' => ['type' => 'textarea', 'pair_end'=>'1', 'label'=> 'item', ],
+        ]]]; 
+}
+
+function get_employee_fields($certification_enabled ="0"){
     $fields = [
     'employee-fields' => [
-        'type' => 'visual_section', 'fields' => 
+        'type' => 'visual_section',
+        'storage' => "1",
+        'fields' => 
             [
             'given_name' => ['type' => 'text', 'label' => 'First Name'],
             'family_name' => ['type' => 'text', 'label' => 'Last Name'],
@@ -116,20 +156,21 @@ function get_employee_fields($has_certification ="0"){
             ]
         ]   
     ];
-    if ($has_certification ==="1"){
-        $fields['employee-fields']['fields']['has_certification'] = ['type' => 'toggle', 'value' => "0"];
+    if ($certification_enabled ==="1"){
         $certification_fields = get_certification_fields();
-        $fields['employee-fields']['fields']['certification_data'] = $certification_fields['certification_data'];
-
+        $fields += $certification_fields;
     }
     return $fields;
 }
 function get_certification_fields() {
   return [
      'certification_data' => [
-        'type' => 'visual_group',
+        'type' => 'visual_split',
+        'label' => 'certification_data',
+        'storage' => "1",
         'condition'=> ['field' => 'has_certification', 'values' => ["1"], 'current_value' => ''],
         'fields' => [
+            'has_certification' => ['type' => 'toggle', 'value' => "0"],
 		    'certification_name' => ['type' => 'text', 'label' => 'Certification Name'],
             'certification_id' => ['type' => 'text', 'label' => 'Certification ID'],
             'certification_valid_from' => ['type' => 'date', 'label' => 'Valid From'],
@@ -138,7 +179,6 @@ function get_certification_fields() {
 		    'certification_url' => ['type' => 'text', 'label' => 'Certification URL'],   
             'certification_issuer_name' => ['type' => 'text', 'label' => 'Issuer Name'],
             'certification_issuer_url' => ['type' => 'text', 'label' => 'Issuer Website'],
-            'certification_about' => ['type' => 'textarea', 'label' => 'Issuer Description'],
 	    	'certification_description'  => ['type' => 'textarea', 'label' => 'Certification Description'],
 	    	'certification_logo' => ['type' => 'image', 'label' => 'Certification Logo'],
             ]
@@ -146,144 +186,99 @@ function get_certification_fields() {
     ];
 }
 
-
-
-final class DIBRACO_GMB_Integrator {
-
-    private static $instance;
-
-    public static function instance() {
-        if (!isset(self::$instance) && !(self::$instance instanceof DIBRACO_GMB_Integrator)) {
-            self::$instance = new DIBRACO_GMB_Integrator;
-            self::$instance->hooks();
+ 
+function get_landscape_post_image_fields($context_type ='') {
+     $fields = [];
+  for ($i = 1; $i <= 2; $i++) {
+    $fields["dibraco_landscape_{$i}"] = ['type'  => 'image', 'label' => "Landscape Image {$i}" ];
+    if ($context_type !== 'unique') {
+            $fields["dibraco_landscape_{$i}_lock"] = ['type'  => 'toggle', 'label' => 'Lock Image', 'options_label' => ["0" => 'Locked', "1" => 'Unlocked']];
         }
-        return self::$instance;
     }
+    return $fields;
+}
 
-    private function hooks() {
-        add_action('admin_init', [$this, 'register_settings']);
-        add_action('admin_init', [$this, 'handle_central_auth_callback']);
+function get_portrait_post_image_fields($context_type = '') {
+   $fields = [];
+     for ($i = 1; $i <= 2; $i++) {
+        $fields["dibraco_portrait_{$i}"] = ['type'  => 'image', 'label' => "Portrait Image {$i}" ];
+        if ($context_type !== 'unique') {
+            $fields["dibraco_portrait_{$i}_lock"] = ['type'  => 'toggle', 'label' => 'Lock Image', 'options_label' => ["0" => 'Locked', "1" => 'Unlocked']];
+        }
     }
+    return $fields;
+}
+function get_before_after_post_fields(){
+    return [
+        'dibraco_before_after' => [
+            'type'=> 'field_group',
+            'storage' => '1',
+            'fields' => [
+                'dibraco_ba_lock' =>  ['type' => 'toggle', 'label'=>'Lock Image?'],
+                'dibraco_before_image' =>  ['type' => 'image',  'label' => 'Before Image'],
+                'dibraco_after_image' =>  ['type' => 'image', 'label' => 'After Image'],
+            ]
+        ],
+    ];
+}
+function get_term_landscape_fields(){
+  return [
+    'dibraco_landscape_images' => [
+      'type' => 'field_group',
+      'storage' => "1",
+      'fields' => [
+        'dibraco_landscape_1' => ['type' => 'image'],
+        'dibraco_landscape_2' => ['type' => 'image'],
+        'dibraco_landscape_3' => ['type' => 'image'],
+        'dibraco_landscape_4' => ['type' => 'image'],
+        'dibraco_landscape_5' => ['type' => 'image'],
+      ]
+    ]
+  ];
+}
 
-    public function register_settings() {
-        register_setting('dibraco_gmb_integrator_options', 'dibraco_settings');
+function get_term_portrait_fields(){
+  return [
+    'dibraco_portrait_images' => [
+      'type' => 'field_group',
+      'storage' => "1",
+      'fields' => [
+        'dibraco_portrait_1' => ['type' => 'image'],
+        'dibraco_portrait_2' => ['type' => 'image'],
+        'dibraco_portrait_3' => ['type' => 'image'],
+        'dibraco_portrait_4' => ['type' => 'image'],
+        'dibraco_portrait_5' => ['type' => 'image'],
+      ]
+    ]
+  ];
+}
+
+function get_type_post_term_icon_field(){
+    return ['term_icon' => ['type' => 'image']];
+}
+function get_before_after_type_term_repeater_fields(){
+    return ['dibraco_before_after' => 
+        
+        [
+        'type' => 'repeater',
+        'label'=> 'before_after',
+        'fields' =>
+                [   
+                    'before_image' => ['type' => 'image', 'label' => 'Before Image'], 
+                    'after_image' => ['type' => 'image', 'label' => 'After Image']
+                ]
+            ]
+        ];
+}
+
+
+function flatten_meta_recursively($array, &$result) {
+    foreach ($array as $key => $value) {
+        $unserialized_value = maybe_unserialize($value);
+        if (is_array($unserialized_value)) {
+            flatten_meta_recursively($unserialized_value, $result);
+        } else {
+            $result[$key] = $unserialized_value;
+        }
     }
-
-    public function settings_page_html() {
-        if (!current_user_can('manage_options')) {
-            return;
-        }
-
-        $settings = get_option('dibraco_settings', []);
-        $auth_server_url = $settings['auth_server_url'] ?? '';
-        ?>
-        <div class="wrap">
-            <h1>GMB Integrator Settings (OAuth Only)</h1>
-            <div style="display:flex; flex-wrap: wrap; gap: 2rem;">
-                <div style="flex: 1; min-width: 350px;">
-                    <form action="options.php" method="post">
-                        <?php settings_fields('dibraco_gmb_integrator_options'); ?>
-                        <h2>Configure Your Central Auth Server</h2>
-                        <p>Enter the URL of your central authentication server. This plugin will manage OAuth tokens received from this server.</p>
-                        <table class="form-table">
-                            <tr>
-                                <th scope="row"><label for="dibraco_auth_server_url">Auth Server URL</label></th>
-                                <td><input type="url" id="dibraco_auth_server_url" name="dibraco_settings[auth_server_url]" value="<?php echo esc_attr($auth_server_url); ?>" class="regular-text" placeholder="https://auth.your-agency.com" /></td>
-                            </tr>
-                        </table>
-                        <?php submit_button('Save Auth Server URL'); ?>
-                    </form>
-                </div>
-                <div style="flex:1; min-width: 350px;">
-                    <h2>Connect Status</h2>
-                    <?php if ($auth_server_url): ?>
-                        <?php if ($this->get_valid_token()): ?>
-                            <p style="color: green; font-weight: bold;">✓ Successfully connected to your Central Auth Server!</p>
-                            <p>This plugin is ready to manage the OAuth tokens provided by your server.</p>
-                        <?php else: ?>
-                            <p>Auth Server URL is saved. Now, initiate the connection to Google through your central server.</p>
-                            <a href="<?php echo $this->get_auth_url(); ?>" class="button button-primary">Connect via Central Auth Server</a>
-                            <p class="description">If you encounter issues, ensure your central auth server is correctly configured and has the necessary Google API credentials and scopes.</p>
-                        <?php endif; ?>
-                    <?php else: ?>
-                        <p>Please enter and save your Auth Server URL in the form to the left to begin.</p>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-        <?php
-    }
-
-    private function get_auth_url() {
-        $settings = get_option('dibraco_settings', []);
-        $auth_server_url = $settings['auth_server_url'] ?? '';
-        if (!$auth_server_url) return '#';
-
-        $callback_url = admin_url('admin.php?page=dibraco-gmb-integrator');
-
-        return add_query_arg('return_to', $callback_url, trailingslashit($auth_server_url) . 'auth.php');
-    }
-
-    public function handle_central_auth_callback() {
-        if (!isset($_GET['page']) || $_GET['page'] !== 'dibraco-gmb-integrator' || !isset($_GET['access_token'])) {
-            return;
-        }
-
-        if (!current_user_can('manage_options')) {
-            wp_safe_redirect(admin_url('admin.php?page=dibraco-gmb-integrator&auth_error=permission'));
-            exit;
-        }
-
-        $access_token = sanitize_text_field($_GET['access_token']);
-        $refresh_token = sanitize_text_field($_GET['refresh_token']);
-        $expires_in = (int) $_GET['expires_in'];
-
-        update_option('dibraco_gmb_access_token', $access_token);
-        update_option('dibraco_gmb_refresh_token', $refresh_token);
-        update_option('dibraco_gmb_token_expires_at', time() + $expires_in);
-
-        delete_option('dibraco_reviews');
-        delete_option('dibraco_reviews_last_fetched');
-        $settings = get_option('dibraco_settings', []);
-        if (isset($settings['selected_locations'])) {
-            unset($settings['selected_locations']);
-            update_option('dibraco_settings', $settings);
-        }
-
-        wp_safe_redirect(admin_url('admin.php?page=dibraco-gmb-integrator'));
-        exit;
-    }
-
-    private function get_valid_token() {
-        $expires_at = get_option('dibraco_gmb_token_expires_at', 0);
-
-        if (time() < $expires_at - 60) {
-            return get_option('dibraco_gmb_access_token');
-        }
-
-        $settings = get_option('dibraco_settings', []);
-        $auth_server_url = $settings['auth_server_url'] ?? '';
-        $refresh_token = get_option('dibraco_gmb_refresh_token');
-
-        if (!$auth_server_url || !$refresh_token) return false;
-
-        $response = wp_remote_post(trailingslashit($auth_server_url) . 'refresh.php', [
-            'body' => ['refresh_token' => $refresh_token],
-            'timeout' => 15,
-        ]);
-
-        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
-            return false;
-        }
-
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        if (isset($body['access_token'])) {
-            update_option('dibraco_gmb_access_token', $body['access_token']);
-            update_option('dibraco_gmb_token_expires_at', time() + (int)$body['expires_in']);
-            return $body['access_token'];
-        }
-
-        return false;
-    }
-
 }
