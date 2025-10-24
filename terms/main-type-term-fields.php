@@ -51,9 +51,9 @@ $this_taxonomy = $term->taxonomy;
           unset($storage_keys[$container_name]);
             }
         }
-    }    
+    }
 
-    $mapped_values = array_intersect_key($all_values, $storage_keys);
+    $mapped_values = dibraco_filter_saved_data($all_values, $storage_keys);
     error_log(json_encode($mapped_values, true));
   
     FormHelper::generateField('who_cares', ['type' => 'valueinjector','meta_array' => $mapped_values]);

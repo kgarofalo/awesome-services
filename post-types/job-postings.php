@@ -225,7 +225,7 @@ function display_job_meta_box($post) {
             }
         }
     }    
-        $mapped_values = array_intersect_key($job_meta, $storage_keys);
+        $mapped_values = dibraco_filter_saved_data($job_meta, $storage_keys);
 error_log(print_r($mapped_values,true));
         if (empty($job_meta)){
     echo FormHelper::generateVisualSection('job-details-form', ['fields' => $job_fields_template]);

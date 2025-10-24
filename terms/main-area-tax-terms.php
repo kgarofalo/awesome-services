@@ -33,8 +33,8 @@ error_log(print_r($all_values,true));
           unset($storage_keys[$container_name]);
         }
     }
-}    
-    $mapped_values = array_intersect_key($all_values, $storage_keys);
+}
+    $mapped_values = dibraco_filter_saved_data($all_values, $storage_keys);
    wp_nonce_field('save_service_area_term', 'service_area_context_nonce');
       $location_term_slug = get_term_meta($current_service_area_term_id, 'area_parent_location_slug', true);
 if (!empty($location_term_slug)) {
