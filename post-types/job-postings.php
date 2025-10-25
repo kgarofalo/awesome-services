@@ -217,15 +217,20 @@ function display_job_meta_box($post) {
         foreach($storage_keys as $container_name => $storage_array_key){
     if (is_array($storage_array_key)){
         if (array_key_exists($container_name, $job_meta)){
-         $job_meta = array_merge($job_meta,$job_meta[$container_name]); 
-          $storage_keys = array_merge($storage_keys,$storage_keys[$container_name]);
-          unset($job_meta[$container_name]);
-          unset($storage_keys[$container_name]);
-          
+            // Check if this is a repeater (has numeric keys) vs nested container (string keys)
+            $is_repeater = isset($job_meta["{$container_name}_row_count"]);
+
+            if (!$is_repeater) {
+                // Only unpack non-repeater nested containers
+                $job_meta = array_merge($job_meta,$job_meta[$container_name]);
+                $storage_keys = array_merge($storage_keys,$storage_keys[$container_name]);
+                unset($job_meta[$container_name]);
+                unset($storage_keys[$container_name]);
             }
         }
+        }
     }    
-        $mapped_values = dibraco_filter_saved_data($job_meta, $storage_keys);
+        $mapped_values = array_intersect_key($job_meta, $storage_keys);
 error_log(print_r($mapped_values,true));
         if (empty($job_meta)){
     echo FormHelper::generateVisualSection('job-details-form', ['fields' => $job_fields_template]);
@@ -294,21 +299,22 @@ function save_job_meta_box_data($post_id) {
    
     $meta_to_save = [];
    foreach ($all_valid_field_names as $field_name) {
-       
 
-         if (substr($field_name, -9) === 'row_count') {
-                
-                $meta_to_save[$field_name] = $_POST[$field_name];
-                continue;
-            }
-            if (is_array($_POST[$field_name])) {
-                $flattened_data = FormProcessor::flatten_array($_POST[$field_name], $field_name);
-                foreach ($flattened_data as $flattened_name => $flattened_value) {
-                    $meta_to_save[$flattened_name] = $flattened_value;
-                }
-            } else {
-                $meta_to_save[$field_name] = $_POST[$field_name];
-            }
+        if (!isset($_POST[$field_name])) {
+            continue;
+        }
+
+        if (substr($field_name, -9) === 'row_count') {
+            $meta_to_save[$field_name] = $_POST[$field_name];
+            continue;
+        }
+
+        // Store arrays (including repeaters) as nested structures
+        if (is_array($_POST[$field_name])) {
+            $meta_to_save[$field_name] = $_POST[$field_name];
+        } else {
+            $meta_to_save[$field_name] = $_POST[$field_name];
+        }
     }
 
 
