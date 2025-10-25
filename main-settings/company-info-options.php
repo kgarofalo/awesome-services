@@ -197,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['submit_action'] === 'save_c
             }
         }
     }
-    $mapped_values = dibraco_filter_saved_data($all_values, $storage_keys);
+    $mapped_values = array_intersect_key($all_values, $storage_keys);
 
     ?>
     <div class="wrap">

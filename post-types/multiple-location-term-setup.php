@@ -62,7 +62,7 @@ foreach($storage_keys as $container_name => $storage_array_key){
             }
         }
     }
-        $mapped_values = dibraco_filter_saved_data($all_values, $storage_keys);
+        $mapped_values = array_intersect_key($all_values, $storage_keys);
         FormHelper::generateField('who_cares', ['type' => 'valueinjector', 'meta_array' => $mapped_values]);
         echo FormHelper::generateVisualSection('location-main-form', ['fields' => $template_fields]);
         FormHelper::generateField('who_cares', ['type' => 'injectionend']);
