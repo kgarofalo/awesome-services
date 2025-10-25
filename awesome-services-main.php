@@ -17,7 +17,6 @@ define('AWESOME_SERVICES_URL', plugin_dir_url(__FILE__));
 require_once AWESOME_SERVICES_PATH . 'includes/shortcode-functions.php';
 require_once AWESOME_SERVICES_PATH . 'field-generation/name-phone-address.php';
 require_once AWESOME_SERVICES_PATH . 'field-generation/value-populator.php';
-require_once AWESOME_SERVICES_PATH . 'field-generation/data-filter.php';
 require_once AWESOME_SERVICES_PATH . 'main-settings/plugin-relationship-settings.php';
 require_once AWESOME_SERVICES_PATH . 'main-settings/company-info-options.php';
 require_once AWESOME_SERVICES_PATH . 'main-settings/shortcode-list.php';
