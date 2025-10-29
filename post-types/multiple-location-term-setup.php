@@ -366,18 +366,21 @@ add_shortcode('service_areas', 'service_areas_shortcode');
 
 function da_get_location_term_or_default($post_id, $extra_data = '', $location_slug = '') {
 	$status = get_option('locations_areas_status');
-	if (($status !== 'both') && ($status !== 'multi_locations')) {
+	if (!$status || ($status !== 'both' && $status !== 'multi_locations')) {
 		return null;
 	}
-	$connector_contexts = get_option('enabled_connector_contexts');
-	$location_tax = $connector_contexts['locations']['taxonomy'];
+	if (($status) && $status !=='none'){
+	    $connector_contexts = get_option('enabled_connector_contexts');
+	    if ($status ==='multi-locations' || $status ==='both'){
+	        $location_tax = $connector_contexts['locations']['taxonomy'];
+	    }
+	    if($status ==='both'){
+            $service_area_tax = $connector_contexts['service_areas']['taxonomy'];
+	    }
+	}
 	$company_info = get_option('company_info');
     $show_address_on_org = $company_info['show_address_on_org'];
-    $service_area_tax = ''; 
-	if ($status === 'both'){
-	    $service_area_tax = $connector_contexts['service_areas']['taxonomy'];
-    }
-	if ($location_slug) {
+	if ($location_slug && ($status ==='multi-locations' || $status ==='both')){
 		$term = get_term_by('slug', $location_slug, $location_tax);
 		if ($term && !is_wp_error($term)) {
 		    $location_term_id = $term->term_id;
@@ -387,25 +390,26 @@ function da_get_location_term_or_default($post_id, $extra_data = '', $location_s
 			 else return $location_term_id;
 		}
 	}
-	$location_term_id = dibraco_get_current_term_id_for_post($post_id, $location_tax);
-    if ($location_term_id !=='') {
-        if($extra_data ==="1"){
-        return  [ 'location_term_id' => $location_term_id ];
-        }
-         else return $location_term_id;
-    }
-    if ($service_area_tax !== ''){
-	$area_term_id = dibraco_get_current_term_id_for_post($post_id, $service_area_tax);
-	if ($area_term_id !=='') {
-		$location_term_id = get_term_meta($area_term_id, 'area_parent_location_term', true);
-		if ($location_term_id !=='') {
-			 if($extra_data ==="1"){
-			 return ['area_term_id' => $area_term_id, 'location_term_id' => $location_term_id];
-		    }
+    if ($status ==='both') {
+	    $area_term_id = dibraco_get_current_term_id_for_post($post_id, $service_area_tax);
+	    if ($area_term_id !=='') {
+	    	$location_term_id = get_term_meta($area_term_id, 'area_parent_location_term', true);
+	    	if ($location_term_id !=='') {
+	    		 if($extra_data ==="1"){
+	    		     return ['area_term_id' => $area_term_id, 'location_term_id' => $location_term_id];
+	    	    }
 		    else return $location_term_id;
 	        }
 	    }
 	}
+	$location_term_id = dibraco_get_current_term_id_for_post($post_id, $location_tax);
+    if ($location_term_id !=='') {
+        if($extra_data ==="1"){
+            return  ['location_term_id' => $location_term_id ];
+        }
+         else return $location_term_id;
+    }
+
 	if ($show_address_on_org ==="0"){
         $default_term_id = $company_info['default_term'];
         return $default_term_id;

@@ -2,70 +2,29 @@
 display: flex;
   flex-direction: column;  
 }
-#job-details-form .section-fields {
-flex-wrap:wrap;
+#job-details-form .dibraco-section-fields {
 display:flex;
-  align-items: flex-start;
-
-}
-#job-details-form .section-fields h4{
-    margin:5px;
-    width:100%;
-    display:flex;
-    flex-direction:column;
-    font-size:1.2em;
+ align-items: flex-start;
+ flex-wrap:wrap;
 }
 
-#education_setup .group-fields{
-    display:flex;
-    flex-direction:row;
-}
-#experience .group-fields{
-    display:flex;
-    flex-direction:row;
-}
-#job-details-form .section-fields .dibraco-section{
+
+#job-details-form .dibraco-section-fields .dibraco-section{
  display: flex;
   flex-direction: column; 
   width:48%;
 }
 
-#job-details-form .dibraco-date {
-    max-width: 48%;
-}
-#job-details-form .dibraco-checkbox {
-    max-width:10%;
-}
 
-#job-details-form .dibraco-section .dibraco-toggle{
-flex-direction:column;
-align-items:center;
-display:flex!important;
-align-self:flex-start;
-display:flex;
-width:40%;
-max-width:100px;
-}
 #job-details-form label + select {
     display:flex;
     flex-direction:column;
-    flex-wrap:wrap;-
-}
-#job-details-form #job-details input[type=text]{
-    min-height:2.5em;
-}
-#job-details-form #job-details input[type=date]{
-width:90%;
-text-transform:uppercase;
- min-height:2.5em;
-}
-#job-details-form #job-details .dibraco-date,
-#job-details-form .dibraco-number{
- max-width:49%;   
+    flex-wrap:wrap;
 }
 
 #job-details-form .dibraco-checkbox {
     display:inline-block;
+      max-width:10%;
     padding-left:5px;
     padding-right:5px;
 }
@@ -73,40 +32,7 @@ text-transform:uppercase;
 
 
 
-#job-details-form #address .address-street-address,
-#job-details-form #address .address-street-address-2{
-    width:48%;
-    
-}
-#job-details-form #address .job-location_type,
-#job-details-form #address .adresses{
-    width:48%;
-}
-#job-details-form #address .address-city,
-#job-details-form #address .address-state,
-#job-details-form #address .address-zipcode,
-#job-details-form #address .address-addy-country,
-#job-details-form #address .address-latitude,
-#job-details-form #address .address-longitude{
-  width:30%;
-}
 
-
-#job-details-form .the-toggle {
-  width: 50px;
-  height: 25px;
-  border-radius: 20px;
-}
-
-
-
-#job-details-form .toggle-input.toggle-no:checked ~ .toggle-label.toggle-no {
-  transform: translateX(40px);
-}
-
-#job-details-form .toggle-input.toggle-yes:checked ~ .toggle-label.toggle-yes {
-  transform: translateX(-40px);
-}
 
 @media (max-width: 768px) {
     #job-details-form #benefits_section,
@@ -125,13 +51,6 @@ text-transform:uppercase;
         width: 100%;
         margin-bottom: 2px;
     }
-}
-
-
-.repeater-rows {
-    display: flex;
-    flex-wrap:wrap;
-    gap:10px
 }
 
 

@@ -1,10 +1,10 @@
 (function () {
   function allowedList(node) {
-    return node.getAttribute('data-controlling-values').split('|'); // Split values by pipe (|)
+    return node.getAttribute('data-controlling-values').split('|'); 
   }
 
   function currentValue(ctrl) {
-    if (ctrl.matches('select')) return ctrl.value; // Return the value from <select>
+    if (ctrl.matches('select')) return ctrl.value; 
     if (ctrl.matches('fieldset')) {
       var checked = ctrl.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked');
       return checked.value; 
@@ -16,7 +16,7 @@
     var deps = document.querySelectorAll('[data-controlling-field="' + controllerId + '"]');
     deps.forEach(function (node) {
       var allowedValues = allowedList(node); 
-      var show = allowedValues.indexOf(value) !== -1; // Show if current value matches allowed values
+      var show = allowedValues.indexOf(value) !== -1; 
       if (show) {
         node.classList.add('visible');
         node.classList.remove('hidden');
@@ -29,18 +29,39 @@
     });
   }
 
-  // Function to initialize and evaluate the dependent field visibility
-  function init() {
-    document.querySelectorAll('[data-controlling-field]').forEach(function (dep) {
+ function init() {
+    const selectorTypes = '.dibraco-select, .dibraco-toggle, .dibraco-radio-fieldset, .dibraco-checkbox';
+    if (!document.querySelector(selectorTypes)) {
+      return;
+    }
+    
+    var dependents = document.querySelectorAll('[data-controlling-field]');
+    dependents.forEach(function (dep) {
       var controllerId = dep.getAttribute('data-controlling-field');
       var controller = document.getElementById(controllerId);
-        evaluateAndToggleDependents(controllerId, currentValue(controller));
+      if (!controller) return;
+      
+      evaluateAndToggleDependents(controllerId, currentValue(controller));
       controller.addEventListener('change', function () {
         evaluateAndToggleDependents(controllerId, currentValue(controller));
       });
     });
   }
-
+  
+  // Watch for repeaters
+  const repeaters = document.querySelectorAll('.dibraco-repeater-wrapper');
+  if (repeaters.length > 0) {
+    const observer = new MutationObserver(function() {
+      init(); // Reinitialize conditions when DOM changes
+    });
+    
+    repeaters.forEach(function(repeater) {
+      observer.observe(repeater, {
+        childList: true,
+        subtree: true
+      });
+    });
+  }
   init();
 })();
 

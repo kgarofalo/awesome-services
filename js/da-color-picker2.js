@@ -1,4 +1,8 @@
 jQuery(document).ready(function ($) {
+    if ($('.dibraco-color-picker').length === 0) {
+        return; 
+    }
+    
     function appendAlphaToHex(hex, alpha) {
         hex = hex.replace('#', '');
         if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');

@@ -1,12 +1,16 @@
 <?php
 
 function render_service_area_meta_box($term_or_post, $service_areas_taxonomy) {
+    error_log('term id or what ' . (print_r($term_or_post, true)));
     $service_area_fields = get_service_area_term_fields();
     $service_areas_context = get_option('enabled_connector_contexts')['service_areas'];
     if ($term_or_post instanceof WP_Post){
         $post_id = $term_or_post->ID;
         $current_service_area_term_id = dibraco_get_current_term_id_for_post($post_id, $service_areas_taxonomy);
     } elseif (!$term_or_post instanceof WP_Post){
+        $area_term = $term_or_post;
+        $current_service_area_term_id = $area_term->term_id;
+      
         $post_id = null;
         $area_term = $term_or_post;
         $current_service_area_term_id = $area_term->term_id;
@@ -19,10 +23,12 @@ function render_service_area_meta_box($term_or_post, $service_areas_taxonomy) {
             $service_area_fields += get_term_portrait_fields();
         }
     }
+    
 $mapped_values = [];
 $all_values = get_term_meta($current_service_area_term_id, '', true);
 $all_values = array_map('maybe_unserialize', array_map('current', $all_values));
 $storage_keys = dibraco_extract_nested_arrays_test($service_area_fields);
+
 error_log(print_r($all_values,true));
  foreach($storage_keys as $container_name => $storage_array_key){
     if (is_array($storage_array_key)){
@@ -35,6 +41,8 @@ error_log(print_r($all_values,true));
     }
 }    
     $mapped_values = array_intersect_key($all_values, $storage_keys);
+    error_log(print_r($mapped_values,true));
+
    wp_nonce_field('save_service_area_term', 'service_area_context_nonce');
       $location_term_slug = get_term_meta($current_service_area_term_id, 'area_parent_location_slug', true);
 if (!empty($location_term_slug)) {
@@ -64,100 +72,110 @@ if (!empty($location_term_slug)) {
         }
     }
 }
+function handle_save_service_area_term($term_id) {
 
-function handle_save_service_area_term($term_id, $service_areas_taxonomy) {
-if (!dibraco_verify_post_save_request('service_area_context_nonce', 'save_service_area_term')) {return;}
-    $service_areas_context = get_option('enabled_connector_contexts')['service_areas'];
-    $template_fields = get_service_area_term_fields();
-    $individual_fields =[];
-    $data_to_save=[];
+$service_areas_context = get_option('enabled_connector_contexts')['service_areas'];    
+    if (!dibraco_verify_post_save_request('service_area_context_nonce', 'save_service_area_term')) {
+        error_log("handle_save_service_area_term: Nonce verification failed for term_id={$term_id}");
+        return;
+    }
+    
+  $template_fields = get_service_area_term_fields();
 
-    if ($service_areas_context['landscape_images'] === "1") {
-           $template_fields += get_term_landscape_fields();
-        }
-        if (($service_areas_context['portrait_images']) === "1") {
-            $template_fields += get_term_portrait_fields();
-        }
-   $submitted_data = $_POST;
-   $repeater_fields_detected = [];
- foreach ($_POST as $key => $value) {
-    if (strpos($key, '_row_count') !== false) {
-        $repeater_field = str_replace('_row_count', '', $key);
+if ($service_areas_context['landscape_images'] === "1") {
+    $template_fields += get_term_landscape_fields();
+}
+if ($service_areas_context['portrait_images'] === "1") {
+    $template_fields += get_term_portrait_fields();
+}
+
+$submitted_data = $_POST;
+
+foreach ($_POST as $field_name => $value) {
+    if (strpos($field_name, '_row_count') !== false) {
+        $repeater_name = str_replace('_row_count', '', $field_name);
+        $row_count = $value;
+        $repeater_data = $_POST[$repeater_name];
         
-        if (isset($_POST["{$repeater_field}_end"])) {
-            $repeater_fields_detected[$repeater_field] = true;
-        }
+        update_term_meta($term_id, $repeater_name, $repeater_data);
+        update_term_meta($term_id, "{$repeater_name}_row_count", $row_count);
+        
+        unset($template_fields[$repeater_name]);
     }
 }
-foreach ($repeater_fields_detected as $repeater_field => $detected) {
-    dibraco_save_repeater_fields($repeater_field, $repeater_fields_detected, 'term');
-}
-   $storage_keys = dibraco_extract_nested_arrays_test($template_fields);
-   foreach ($storage_keys as $container_name => $field_name) {
-         if (!is_array($field_name)) {
-             $individual_fields[$field_name]= $_POST[$field_name];
+      $storage_keys = dibraco_extract_nested_arrays_test($template_fields);
+    
+    foreach ($storage_keys as $container_name => $field_name) {
+        if (!is_array($field_name)) {
+            $individual_fields[$field_name] = $_POST[$field_name];
         }   
-        if (is_array($field_name)){
-             foreach ($field_name as $field_name => $field_value){
-                $data_to_save[$container_name][$field_name] = $_POST[$field_name];
+        if (is_array($field_name)) {
+            foreach ($field_name as $nested_field => $nested_value) {
+                $data_to_save[$container_name][$nested_field] = $_POST[$nested_field];
             }
-            update_term_meta($term_id, $container_name, $data_to_save);
+            update_term_meta($term_id, $container_name, $data_to_save[$container_name]);
         }
     }
      
     foreach ($individual_fields as $field_name => $value) {
         update_term_meta($term_id, $field_name, $value);
     }
+    
+    // GEOCODING
     $city = $individual_fields['city'];
     $state = $individual_fields['state'];
     $latitude = $individual_fields['latitude'];
-    $longitude =  $individual_fields['longitude'];
-    if (($latitude ==='' && $longitude === '') && ($city!=='' && $state !=='')) {
+    $longitude = $individual_fields['longitude'];
+    
+    if (($latitude === '' && $longitude === '') && ($city !== '' && $state !== '')) {
         $geo = get_lat_long_from_osm_2('', $city, $state, '');
         if ($geo) {
-           $latitude = $geo['lat'];
-           $longitude  = $geo['long'];
-         if (isset($geo['boundingbox'])) {
+            $latitude = $geo['lat'];
+            $longitude = $geo['long'];
+            if ($geo['boundingbox']) {
                 $polygon_json = json_encode($geo['boundingbox']);
-                update_term_meta($term_id,'bounding_box', $polygon_json);
+                update_term_meta($term_id, 'bounding_box', $polygon_json);
             }
         }
-    update_term_meta($term_id, 'latitude', $latitude);
-    update_term_meta($term_id, 'longitude', $longitude);
+        update_term_meta($term_id, 'latitude', $latitude);
+        update_term_meta($term_id, 'longitude', $longitude);
     }
-     $status = get_option('locations_areas_status');
-     if ($status ==='both'){
-        $new_area_parent_term = $submitted_data['area_parent_location_term'];
-        $current_area_parent_term = get_term_meta($term_id, 'area_parent_location_term', true);
-     }
-   
+    
+    // RELATED TYPE CONTEXTS
     $related_type_contexts = $service_areas_context['related_type_contexts'];
     if (!empty($related_type_contexts)) {
         foreach ($related_type_contexts as $type_context_data) {
             $meta_key_to_save = "related_type_{$type_context_data['type_name']}";
             $current_meta_data = get_term_meta($term_id, $meta_key_to_save, true);
-            foreach ($submitted_data[$meta_key_to_save] as $type_term_id => $term_posts_from_submission) {
-                if ($type_context_data['post_per_term'] === '1') {
-                    $current_meta_data[$type_term_id]['related_post_title'] = $term_posts_from_submission['related_post_title'];
-                } else {
-                    foreach ($term_posts_from_submission as $related_post_id => $post_data_from_submission) {
-                        $current_meta_data[$type_term_id][$related_post_id]['related_post_title'] = $post_data_from_submission['related_post_title'];
+            
+            if ($submitted_data[$meta_key_to_save]) {
+                foreach ($submitted_data[$meta_key_to_save] as $type_term_id => $term_posts_from_submission) {
+                    if ($type_context_data['post_per_term'] === '1') {
+                        $current_meta_data[$type_term_id]['related_post_title'] = $term_posts_from_submission['related_post_title'];
+                    } else {
+                        foreach ($term_posts_from_submission as $related_post_id => $post_data_from_submission) {
+                            $current_meta_data[$type_term_id][$related_post_id]['related_post_title'] = $post_data_from_submission['related_post_title'];
+                        }
                     }
                 }
+                update_term_meta($term_id, $meta_key_to_save, $current_meta_data);
             }
-            update_term_meta($term_id, $meta_key_to_save, $current_meta_data);
         }
     }
+    
+    // RELATED UNIQUE CONTEXTS
     $related_unique_contexts = $service_areas_context['related_unique_contexts'];
     if (!empty($related_unique_contexts)) {
         foreach ($related_unique_contexts as $unique_context_data) {
             $meta_key_to_save_unique = "related_unique_{$unique_context_data['unique_name']}";
             $current_unique_meta_data = get_term_meta($term_id, $meta_key_to_save_unique, true);
-            foreach ($submitted_data[$meta_key_to_save_unique] as $post_id => $post_data_from_submission) {
-                $current_unique_meta_data[$post_id]['related_post_title'] = $post_data_from_submission['related_post_title'];
+            
+            if ($submitted_data[$meta_key_to_save_unique]) {
+                foreach ($submitted_data[$meta_key_to_save_unique] as $post_id => $post_data_from_submission) {
+                    $current_unique_meta_data[$post_id]['related_post_title'] = $post_data_from_submission['related_post_title'];
+                }
+                update_term_meta($term_id, $meta_key_to_save_unique, $current_unique_meta_data);
             }
-
-            update_term_meta($term_id, $meta_key_to_save_unique, $current_unique_meta_data);
         }
-  }
+    }
 }

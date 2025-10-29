@@ -3,7 +3,7 @@
     flex-wrap: wrap;
     width: 100%;
 }
-#relationships-settings #contexts .group-fields.hidden {
+#relationships-settings #contexts .dibraco-group-fields.hidden {
     display: none!important;
 }
 
@@ -13,7 +13,7 @@ margin:.5em;
 display:flex;
 flex-direction:column;
 }
-#relationships-settings .toggles-sidebar {
+#toggles_section {
     width: 15%;
     display: flex;
     flex-direction: column;
@@ -31,19 +31,19 @@ flex-direction:column;
     flex-direction:column;
 }
 
-#relationships-settings #contexts .section-fields {
+#relationships-settings #contexts .dibraco-section-fields {
     width: 100%; 
      display: flex;
        flex-direction: column;
 }
-#relationships-settings #contexts .section-fields .dibraco-section {
+#relationships-settings #contexts .dibraco-section-fields .dibraco-section {
     display: flex;
     width:100%;
     flex-direction: row;
     flex-wrap: wrap;
 }
 
-#relationships-settings #contexts .group-fields {
+#relationships-settings #contexts .dibraco-group-fields {
     display:flex;
     flex-wrap:wrap;
     max-width:30%;
@@ -52,9 +52,8 @@ flex-direction:column;
     margin-left: 10px;
     border: 1px solid black;
 }
-#relationships-settings #contexts fieldset{
-    width:40%;
-}
+
+
 
 #contexts .the-toggle {
   width: 40px;

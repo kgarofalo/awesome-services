@@ -316,30 +316,38 @@ foreach ($cards as $card) {
 
     if ($card_style_settings['cards_show_title'] === '1') {
     $heading_tag = $card_style_settings['title_heading_type']; 
-    $title_html = '<div class="' . esc_attr("{$css_context_name}-title-section") . '">' . '<' . tag_escape($heading_tag) . ' class="card-title">' . '<a class="card-title-link" href="' . esc_url($card['related_post_url']) . '" title="' . esc_attr($card['related_post_title']) . '" aria-label="' . esc_attr($card['related_post_title']) . '">' . esc_html($card['related_post_title']) . '</a>' . '</' . tag_escape($heading_tag) . '>' . '</div>';
+    $title_html = '<div class="' . "{$css_context_name}-title-section" . '">' . '<' . $heading_tag . ' class="card-title">' . '<a class="card-title-link" href="' . $card['related_post_url'] . '" title="' . $card['related_post_title'] . '" aria-label="' . $card['related_post_title'] . '">' . esc_html($card['related_post_title']) . '</a>' . '</' . tag_escape($heading_tag) . '>' . '</div>';
     $sortable_content[$card_style_settings['cards_title_position']] = $title_html;
     } 
-    if ($card_style_settings['cards_show_image'] === '1') {
-        $image_field = $card_style_settings['cards_image_field'];
-        $image_id = get_post_meta($card['related_post_id'], $image_field, true);
-        if (empty($image_id)) {
-            $image_id = get_post_thumbnail_id($card['related_post_id']);
+   if ($card_style_settings['cards_show_image'] === '1') {
+    $image_field = $card_style_settings['cards_image_field'];
+    $image_value = get_post_meta($card['related_post_id'], $image_field, true);
+    
+    if (empty($image_value)) {
+        $image_value = get_post_thumbnail_id($card['related_post_id']);
+    }
+    
+    if (!empty($image_value)) {
+        if (is_numeric($image_value)) {
+            $image_url = wp_get_attachment_image_url($image_value, 'medium');
+        } else {
+            $image_url = $image_value;
         }
-        if ($image_id) {
-            $image_url = wp_get_attachment_image_url($image_id, 'medium');
-           $sortable_content[$card_style_settings['cards_image_position']] = '<div class="'.esc_attr("{$css_context_name}-image-section card-image-wrap").'"><img class="card-image" src="'.esc_url($image_url).'" alt="'.esc_attr($card['related_post_title']).'" title="'.esc_attr($card['related_post_title']).'"></div>';
-
+        
+        if (!empty($image_url)) {
+            $sortable_content[$card_style_settings['cards_image_position']] = '<div class="'. "{$css_context_name}image-section card-image-wrap".'"><img class="card-image" src="'.$image_url.'" alt="'.esc_attr($card['related_post_title']).'" title="'.esc_attr($card['related_post_title']).'"></div>';
+            }
         }
     }
     if ($card_style_settings['cards_show_description'] === '1') {
         $description = get_post_meta($card['related_post_id'], 'da_banner_description', true);
         
         if (!empty($description)) {
-            $sortable_content[$card_style_settings['cards_description_position']] = '<p class="' . esc_attr("{$css_context_name}-description-section card-description") . '">' . wp_strip_all_tags($description) . '</p>';
+            $sortable_content[$card_style_settings['cards_description_position']] = '<p class="' . "{$css_context_name}-description-section card-description" . '">' . wp_strip_all_tags($description) . '</p>';
         }
     }
     if ($card_style_settings['cards_show_button'] === '1') {
-      $sortable_content[$card_style_settings['cards_button_position']] = '<a href="' . esc_url($card['related_post_url']) . '"  class="' . esc_attr("{$css_context_name}-button card-button") . '" title="' . esc_attr($button_title) . '" aria-label="' . esc_attr($button_title) . '">' . esc_html($button_title) . '</a>';
+      $sortable_content[$card_style_settings['cards_button_position']] = '<a href="' . $card['related_post_url'] . '"  class="' . "{$css_context_name}-button card-button" . '" title="' . esc_attr($button_title) . '" aria-label="' . $button_title . '">' . esc_html($button_title) . '</a>';
     } 
     ksort($sortable_content);
 

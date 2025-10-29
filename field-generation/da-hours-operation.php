@@ -23,7 +23,7 @@ foreach ($days as $full_day => $short_day) {
     $upper_short_day = ucfirst($short_day);
     $fields["open_{$full_day}"]=[
         'type' => 'toggle',
-        'label' => "{$full_day}_open",
+        'label' => "{$full_day} open",
         'value' => "1",
         'options_label' => ["0" => 'Open', '1' => 'closed']
         ]; 

@@ -29,18 +29,22 @@ jQuery(document).ready(function($) {
         var newIndex = lastRowIndex + 1;
         var clonedRow = lastRepeaterRow.clone(true);
     clonedRow.attr('data-row-index', newIndex);
-        clonedRow.find('input, select, textarea').each(function() { 
+        clonedRow.find('input, select, textarea').each(function() {
+          if (this.type !== 'checkbox' && this.type !== 'radio') {
+
         $(this).val(''); 
+        }
         });
     clonedRow.find('label').each(function() {
     var label = $(this);
-    var currentText = label.text();
+    var labelHtml = label.html();
     var indexRegex = new RegExp('\\b' + lastRowIndex + '\\b', 'g');
-    var newText = currentText.replace(indexRegex, newIndex);
-    label.text(newText);
+    var newHtml = labelHtml.replace(indexRegex, newIndex);
+    label.html(newHtml); // Set full HTML back
 });
 clonedRow.find('img').each(function() { 
     $(this).attr('src', ''); 
+    $(this).attr('image_id','');
 });
         clonedRow.find('.remove-row-button[data-name="' + fragmentOne + '"]')
             .attr('data-row-index', newIndex)

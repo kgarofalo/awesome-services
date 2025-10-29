@@ -154,8 +154,6 @@ function initialize_dafields($request_from_where = '') {
           ] + $cert_fields + [
     ];
     if ($request_from_where === 'location_') {
-             $da_fields += get_repeater_field_list();
-      
         if ($locations_context['landscape_images'] === "1") {
             $da_fields += get_term_landscape_fields();
          }

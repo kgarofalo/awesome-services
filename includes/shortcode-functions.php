@@ -139,23 +139,6 @@ function dibraco_register_all_dynamic_shortcodes() {
 }
 //add_action('init', 'dibraco_register_all_dynamic_shortcodes');
 
-if ($field_type === 'image') {
-    if (is_numeric($value)) {
-        // Old format: attachment ID
-        $size = isset($atts['size']) ? sanitize_text_field($atts['size']) : 'large';
-        if (isset($atts['output']) && $atts['output'] === 'url') {
-            return wp_get_attachment_image_url($value, $size);
-        }
-        return wp_get_attachment_image($value, $size);
-    } else {
-        // New format: direct URL
-        if (isset($atts['output']) && $atts['output'] === 'url') {
-            return $value;
-        }
-        $size_class = isset($atts['size']) ? sanitize_text_field($atts['size']) : 'large';
-        return '<img src="' . $value . '" class="size-' . $size_class . '" alt="">';
-    }
-}
 function dibraco_image_shortcode_handler($atts = [], $content = null, $meta_key = '') {
     if (is_admin()) {
         return '';

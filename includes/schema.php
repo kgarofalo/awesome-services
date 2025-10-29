@@ -110,26 +110,35 @@ public static function build_logo_node() {
         return $entity;
     }
 
- public static function build_website_node() {
-        $publisher = [ '@type' => self::$company_schema_type,
-            '@id' => self::$company_entity_id];
-
-        return [
-            '@type' => 'WebSite',
-            '@id' => self::$website_id,
-            'url' => self::$home_url,
-            'name' => get_bloginfo('name'),
-            'description' => get_bloginfo('description'),
-            'publisher' => $publisher,
-            'inLanguage'  => get_bloginfo('language'),
-            'potentialAction' => [
-                '@type' => 'SearchAction',
-                'target' => [
-                    '@type' => 'EntryPoint',
-                    'urlTemplate' => self::$home_url . '?s={search_term_string}', ],
-                'query-input' => 'required name=search_term_string', ],
-        ];
-    }
+public static function build_website_node() {
+    $publisher = [
+        '@type' => self::$company_schema_type,
+        '@id' => self::$company_entity_id
+    ];
+    return [
+        '@type' => 'WebSite',
+        '@id' => self::$website_id,
+        'url' => self::$home_url,
+        'name' => self::$company_info['name'],
+        'description' => self::$company_info['company_description'],
+        'publisher' => $publisher,
+        'inLanguage' => get_bloginfo('language'),
+        'about' => self::$about_page_url,
+        'contactPoint' => [
+            '@type' => 'ContactPoint',
+            'telephone' => format_phone_number_e164(self::$company_info['phone_number']),
+            'contactType' => 'customer service',
+            'url' => self::$contact_page_url
+        ],
+        'potentialAction' => [
+            '@type' => 'SearchAction',
+            'target' => [
+                '@type' => 'EntryPoint',
+                'urlTemplate' => self::$home_url . '?s={search_term_string}',
+            ],
+            'query-input' => 'required name=search_term_string',
+        ],
+    ];
 }
 
 function inject_dynamic_schema() {
@@ -300,71 +309,91 @@ function generate_combined_schema_graph($current_post_id) {
 
     return [];
 }
-
 function build_employee_entity($post_id) {
-$status = DibracoSchemaEnv::$status;
-
+    $status = DibracoSchemaEnv::$status;
     $page_url = get_permalink($post_id);
+    
     $entity = [
         '@type' => 'Person',
         '@id'   => $page_url . '/#employee',
         'url'   => $page_url,
     ];
-   $employee_data = get_post_meta($post_id, 'employee-fields', true);
-
-     $entity['givenName']   = $employee_data['given_name'];
+    
+    $employee_data = get_post_meta($post_id, 'employee-fields', true);
+    $entity['givenName']   = $employee_data['given_name'];
     $entity['familyName']  = $employee_data['family_name'];
     $entity['email']       = $employee_data['work_email'];
     $entity['telephone']   = $employee_data['work_phone'];
     $entity['jobTitle']    = $employee_data['job_title'];
     $entity['description'] = wp_strip_all_tags($employee_data['employee_bio']);
-
+    
     $organization_stub = DibracoSchemaEnv::build_organization_stub_node();
     $entity['worksFor'] = ['@id' => $organization_stub['@id']];
-
+    
     if ($status === 'multi_locations' || $status === 'both') {
         $enabled_connector_contexts = get_option('enabled_connector_contexts');
         $locations_taxonomy = $enabled_connector_contexts['locations']['taxonomy'];
-
         $location_term_id = dibraco_get_current_term_id_for_post($post_id, $locations_taxonomy);
-
-        if (!empty($location_term_id)) {
+        if ($location_term_id) {
             $local_business_stub = build_local_business_stub_from_data($location_term_id);
             $entity['jobLocation'] = ['@id' => $local_business_stub['@id']];
         }
     }
-
+    
     $employee_image_id = get_post_meta($post_id, 'dibraco_portrait_1', true);
-    if ($employee_image_id === '') {
-        $thumbnail_id = get_post_thumbnail_id($post_id);
-        if ($thumbnail_id) {
-            $employee_image_id = $thumbnail_id;
-        }
+    if (!$employee_image_id) {
+        $employee_image_id = get_post_thumbnail_id($post_id);
     }
-
-    $employee_image_url = '';
-
-    if ($employee_image_id) {
-        $url_from_id = wp_get_attachment_url($employee_image_id);
-        if ($url_from_id) {
-            $employee_image_url = $url_from_id;
-        }
-    }
-
+    
+  $employee_image_url = get_kml_image_url($employee_image_id);
     if ($employee_image_url) {
-        $entity['image'] = $employee_image_url;
+     $entity['image'] = $employee_image_url;
     }
 
+    
+    $enabled_unique_contexts = get_option('enabled_unique_contexts');
+    $certifications_enabled = $enabled_unique_contexts['employee']['certifications'] ?? '';
+    
+    if ($certifications_enabled === "1") {
+        $cert_data = get_post_meta($post_id, 'certification_data', true);
+        if (!empty($cert_data) && $cert_data['has_certification'] === "1") {
+            $entity['hasCredential'] = [
+                '@type' => 'EducationalOccupationalCredential',
+                'name' => $cert_data['certification_name'],
+                'credentialCategory' => 'certification',
+                'recognizedBy' => [
+                    '@type' => 'Organization',
+                    'name' => $cert_data['certification_issuer_name'],
+                    'url' => $cert_data['certification_issuer_url']
+                ]
+            ];
+            
+            if ($cert_data['certification_url']) {
+                $entity['hasCredential']['url'] = $cert_data['certification_url'];
+            }
+            
+            if ($cert_data['certification_valid_from']) {
+                $entity['hasCredential']['dateCreated'] = $cert_data['certification_valid_from'];
+            }
+            
+            if ($cert_data['certification_expires']) {
+                $entity['hasCredential']['expires'] = $cert_data['certification_expires'];
+            }
+        }
+    }
+    
     return $entity;
 }
-
 function build_main_company_entity() {
     $company_info = DibracoSchemaEnv::$company_info;
     $status = DibracoSchemaEnv::$status;
     $show_address_on_org = DibracoSchemaEnv::$show_address_on_org;
     $image = '';
-    if ($show_address_on_org === '1' && !empty($company_info['exterior_image'])) {
-        $image = wp_get_attachment_image_url($company_info['exterior_image'], 'full');
+    if ($show_address_on_org === '1') {
+       $exterior_image_url = $company_info['exterior_image'] ?? '';
+       if ($exterior_image_url !=='' && is_numeric($exterior_image_url)){
+            $exterior_image_url = wp_get_attachment_image_url($exterior_image_url, 'full');
+           }
     }
    $telephone = format_phone_number_e164($company_info['phone_number']);
    $entity = [
@@ -670,7 +699,7 @@ function build_local_business_entity_from_data($post_id, $location_term_id, $con
                         $entity['hasOfferCatalog'][] = $new_catalog;
                     }
                 } else {
-                    //placeholderfornonservice
+
                 }
     } elseif ($type_context_data['post_per_term'] !== "1") {
         //placeholderhere
@@ -1048,9 +1077,7 @@ function create_geoshape_polygon_string_from_service_areas($coordinate_pairs) {
         $angleB = atan2($b[1] - $centroid['y'], $b[0] - $centroid['x']);
         return $angleA <=> $angleB;
     });
-    if ($polygon_points[0] !== end($polygon_points)) {
         $polygon_points[] = $polygon_points[0];
-    }
     $formatted_polygon_string = '';
     foreach ($polygon_points as $i => $point) {
         $formatted_polygon_string .= $point[1] . ' ' . $point[0];

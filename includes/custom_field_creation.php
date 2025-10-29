@@ -7,7 +7,7 @@ function da_render_custom_fields_page() {
     $all_custom_fields = get_option('dibraco_custom_fields', []);
     $field_options = ['text' => 'Text' , 'textarea' => 'Text Area', 'wysiwyg' => 'Wysiwig' ];
     if (isset($_POST['da_save_custom_fields_nonce']) && wp_verify_nonce($_POST['da_save_custom_fields_nonce'], 'da_save_custom_fields_action')) {
-        $context_to_save = sanitize_key($_POST['context_selection']);
+        $context_to_save = $_POST['context_selection'];
         $new_fields_for_context = [];
         $validation_error_message = '';
         if (!empty($_POST['fields'])) {
@@ -65,7 +65,7 @@ function da_render_custom_fields_page() {
              <label for="context_selector" style="font-weight:bold; font-size:1.2em;">Editing fields for context:</label>
              <select id="context_selector" onchange="window.location.href='?page=dibraco-relationships-custom-fields&context=' + this.value;">
                  <?php foreach ($enabled_contexts as $context_name => $context_data) : ?>
-                     <option value="<?php echo esc_attr($context_name); ?>" <?php selected($current_context, $context_name); ?>>
+                     <option value="<? $context_name; ?>" <?php selected($current_context, $context_name); ?>>
                          <?php echo esc_html(ucwords(str_replace(['-', '_'], ' ', $context_data['post_type']))); ?>
                      </option>
                  <?php endforeach; ?>

@@ -69,13 +69,14 @@ function dibraco_enqueue_admin_scripts($hook_suffix) {
         wp_enqueue_script('jquery-ui-slider');
         wp_enqueue_script('jquery-ui-sortable');
         wp_enqueue_script('postbox');
+        wp_enqueue_script('media-editor');
         wp_enqueue_script('wp-util');
         wp_enqueue_media();
         wp_enqueue_editor();
         wp_enqueue_style('common-fields-style', AWESOME_SERVICES_URL . 'css/da-common-fields.css');
         wp_enqueue_script('da-color-picker2', AWESOME_SERVICES_URL . 'js/da-color-picker2.js', ['jquery', 'wp-color-picker', 'jquery-ui-slider'], false, true);
         wp_enqueue_script('da-repeater', AWESOME_SERVICES_URL . 'js/da-repeater.js', ['jquery'], false, true);
-        wp_enqueue_script('media-fields-images-terms-script', AWESOME_SERVICES_URL . 'js/da-media-fields-images-terms.js', ['jquery', 'media-views', 'editor'], null, true);
+        wp_enqueue_script('media-fields-images-terms-script', AWESOME_SERVICES_URL . 'js/da-media-fields-images-terms.js', ['jquery', 'media-views', 'media-editor'], null, true);
         wp_enqueue_script('da-conditional-fields', AWESOME_SERVICES_URL . 'js/da-conditional-fields.js', ['jquery'], false, true);
     }
      
@@ -128,15 +129,16 @@ function awesome_register_main_settings_menu() {
         if (($context_data['context_type'] === 'type') && ($context_data['post_per_term'] === '1')) {
             add_submenu_page($slug, 'Main Posts Overview', 'Main Posts', 'manage_options', "$slug-main-posts", 'render_dibraco_main_posts_screen');
             break;
-            } 
+        } 
     }
   $selected_contexts = get_option('selected_contexts', []);
        if (!empty($selected_contexts)) {
         foreach ($selected_contexts as $selected_context_name) {
             $base_name = str_replace('_', '-', $selected_context_name);
+            
             $context_data = $enabled_contexts[$selected_context_name];
             $menu_slug = "card-styles-{$base_name}";
-            $saved_settings = get_option('main_service_card_styles');
+            $saved_settings = get_option("{$selected_context_name}_card_styles");
             $label = ucwords(str_replace('-', ' ', $menu_slug));
             add_submenu_page($slug, $label, $label, 'manage_options', $menu_slug,
                 function () use ($saved_settings, $context_data, $selected_context_name) {

@@ -968,18 +968,28 @@ function dibraco_verify_post_save_request($nonce_field_name, $nonce_action) {
     return true;
 }
 
-
 function setup_type_edit_screen($post_type, $taxonomies_for_edit_posts) {
     add_filter("manage_edit-{$post_type}_columns", function ($columns) use ($taxonomies_for_edit_posts) {
         foreach ($taxonomies_for_edit_posts as $context_name => $taxonomy) {
-            $columns["taxonomy-{$taxonomy}"] = ucwords(str_replace(['-', '_'], ' ', $context_name));
+              $columns["taxonomy-{$taxonomy}"] = ucwords(str_replace(['-', '_'], ' ', $context_name));
+              if ($context_name === 'jobs'){ $columns['job_expiration'] = 'Expires';};
         }
         return $columns;
     }, 99);
-    
+   add_filter("manage_{$post_type}_posts_custom_column", function($column_name, $post_id) {
+    if ($column_name === 'job_expiration') {
+        $job_meta = get_post_meta($post_id, '_job_meta', true);
+        if ($job_meta['job_expires'] === '1' && !empty($job_meta['valid_through'])) {
+            echo $job_meta['valid_through'];
+        } else {
+            echo '—';
+        }
+    }
+}, 10, 2);
     add_filter("manage_edit-{$post_type}_sortable_columns", function ($sortable) use ($taxonomies_for_edit_posts) {
-        foreach ($taxonomies_for_edit_posts as $taxonomy) {
+        foreach ($taxonomies_for_edit_posts as $context_name => $taxonomy) {
             $sortable["taxonomy-{$taxonomy}"] = "taxonomy-{$taxonomy}";
+            if ($context_name === 'jobs'){ $sortable['job_expiration'] = 'job_expiration';}
         }
         return $sortable;
     }, 99);
@@ -987,9 +997,13 @@ function setup_type_edit_screen($post_type, $taxonomies_for_edit_posts) {
     add_filter('quick_edit_show_taxonomy', function ($show, $tax) use ($taxonomies_for_edit_posts) {
         return in_array($tax, $taxonomies_for_edit_posts) ? false : $show;
     }, 99, 2);
-    
     add_action('quick_edit_custom_box', function ($col) use ($taxonomies_for_edit_posts) {
         foreach ($taxonomies_for_edit_posts as $context_name => $taxonomy) {
+            if ($context_name ==='jobs'){
+            if($col === 'job_expiration'){
+                echo FormHelper::generateField('valid_through', ['type' => 'date', 'label' => 'Expires']); break;
+            }
+            }
             if ($col === "taxonomy-{$taxonomy}") {
                 $options = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => false, 'fields' => 'id=>name']);
                 echo FormHelper::generateRadioFieldsetWithIntegerValues("{$taxonomy}_term", $context_name, '', $options, []);
@@ -1002,7 +1016,6 @@ function setup_service_area_location_assignment($taxonomy) {
     $locations_taxonomy = get_option('enabled_contexts')['locations']['taxonomy'];
     $act_to_lct_assignments = get_option('act_to_lct_assignments', []);
     $location_terms = get_terms(['taxonomy' => $locations_taxonomy, 'hide_empty' => false, 'fields' => 'id=>name']);
-    
     wp_enqueue_script('dibraco-quick-edit-term', AWESOME_SERVICES_URL . 'js/term-quickedit.js', ['jquery', 'inline-edit-tax'], null, true);
     add_filter("manage_edit-{$taxonomy}_columns", function ($columns) {
         $columns['area_parent_location_name'] = 'Parent Location';
@@ -1019,7 +1032,7 @@ function setup_service_area_location_assignment($taxonomy) {
             return "<span>{$location_name}</span><div class='area_parent_location_term hidden' data-location-term-id='{$location_term_id}'></div>";
         }
     }, 20, 3);
-    add_action('quick_edit_custom_box', function($column_name) use ($location_terms) {
+    add_action('quick_edit_custom_box', function($column_name) use ($location_terms, $act_to_lct_assignments) {
         if ($column_name === 'area_parent_location_name') {
             echo FormHelper::generateRadioFieldsetWithIntegerValues("area_parent_location_term", 'Associated Location', '', $location_terms, []);
         }
@@ -1028,183 +1041,116 @@ function setup_service_area_location_assignment($taxonomy) {
 }
 
 
-
-function dibraco_load_scripts_for_contexts($hook_suffix) {
-    
-$current_post_type = $screen->post_type ?? '';
-$current_taxonomy  = $screen->taxonomy ?? '';
-$single_post_new_load = ($hook_suffix ==='post-new.php');
-$single_post_update = ($hook_suffix ==='post.php');
-$single_term_load = ($hook_suffix ==='term.php');
-$post_list_load = ($hook_suffix ==='edit.php');
-$all_terms_load = ($hook_suffix ==='edit-tags.php');
-$is_page_screen = ($screen->post_type === 'page' && get_option('enable_custom_fields_for_pages') === '1');
-$single_edit_load = ['term.php', 'post.php', 'post-new.php'];
-    $enabled_contexts = get_option('enabled_contexts');
-        foreach ($enabled_contexts as $context => $context_data) {
-            $context_type = $context_data['context_type'];
-            $context_name = $context_data['context_name'];
-            $post_type = $context_data['post_type'];
-            $taxonomies_for_edit_posts = [];
-            $taxonomies_for_edit_single_post = [];
-            if ($context_type !== 'unique') {
-                $taxonomy = $context_data['taxonomy'];
-                $taxonomies_for_edit_posts[$context_name] = $taxonomy;
-                $taxonomies_for_edit_single_post[] = $taxonomy;
-               
-              }
-        if ($current_post_type !== $post_type && $current_taxonomy !== $taxonomy) {
-            continue;
-        }
-     
-         if ($single_edit_load) {
-             $editor_type = 'classic';
-            if ($screen->is_block_editor()) {
-               $editor_type = 'block';
-            }
-             if ($context_name === 'jobs' && $current_post_type === $post_type)  {
-                      wp_enqueue_style('job-postings-style', AWESOME_SERVICES_URL . 'css/da-job-postings.css');
-                      add_action('post_submitbox_misc_actions', 'display_job_expiration_date', 25, 1);
-                  function display_job_expiration_date($post) {
-                    $valid_through_date_str = get_post_meta($post->ID, '_job_meta', true)['valid_through'] ?? '';
-                    if (!$valid_through_date_str) return;
-                        $expiration_timestamp = strtotime($valid_through_date_str);
-                        if(!$expiration_timestamp)return;
-                        $formatted_date = date_i18n(get_option('date_format'), $expiration_timestamp);
-                        echo '<div class="misc-pub-section curtime misc-pub-expiration-date">';
-                        echo '<strong><span id="timestamp"> Expires:</span></strong> ' . $formatted_date . '</span>';
-                        echo '</div>';
-                    }
-                }
-            if ($editor_type ==='classic'){
-                $scripts=['wp-color-picker', 'media', 'jquery-ui-slider', 'jquery-ui-sortable', 'media-views', 'postbox','wp-util', 'plugins', 'wp-edit-post'];
-               foreach ($scripts as $script_handle) {
-                wp_enqueue_script($script_handle);
-               }
-               wp_enqueue_media();
-                wp_enqueue_script('da-repeater', AWESOME_SERVICES_URL . 'js/da-repeater.js', ['jquery'], false, true);
-                wp_enqueue_script('media-fields-images-terms-script', AWESOME_SERVICES_URL . 'js/da-media-fields-images-terms.js', ['editor', 'jquery', 'media-views'], null, true);
-                wp_enqueue_script('da-conditional-fields', AWESOME_SERVICES_URL . 'js/da-conditional-fields.js', ['jquery'], false, true);
-            }
-            if (!empty($taxonomies_for_edit_single_post) && $editor_type === 'block') {
-                  $scripts=['wp-color-picker', 'media', 'jquery-ui-slider', 'jquery-ui-sortable', 'media-views', 'wp-plugins', 'wp-edit-post', 'wp-element', 'wp-components', 'editor','wp-util'];
-                foreach ($scripts as $script_handle) {
-                    wp_enqueue_script($script_handle);
-               }
-                wp_enqueue_media();
-                wp_enqueue_script('da-repeater', AWESOME_SERVICES_URL . 'js/da-repeater.js', ['jquery'], false, true);
-                wp_enqueue_script('media-fields-images-terms-script', AWESOME_SERVICES_URL . 'js/da-media-fields-images-terms.js', ['jquery', 'editor', 'media-views'], null, true);
-                wp_enqueue_script('da-conditional-fields', AWESOME_SERVICES_URL . 'js/da-conditional-fields.js', ['jquery'], false, true);
-
-                foreach ($taxonomies_for_edit_single_post as $taxonomy) {
-                    $panel_id = "taxonomy-panel-{$taxonomy}";
-                    $script = "wp.data.dispatch('core/editor').removeEditorPanel('{$panel_id}');";
-                    wp_add_inline_script('wp-edit-post', $script);
-                }
-            }
-        }
-    
-     
-        }
-    }
-        
-function my_plugin_load_lodash_workaround() {
-    if ( ! wp_script_is( 'lodash', 'enqueued' ) ) {
-        wp_enqueue_script( 'lodash' );
-    }
-}
-add_action( 'enqueue_block_editor_assets', 'my_plugin_load_lodash_workaround', 999 );
-
 add_action('current_screen', function ($current_screen) {
     $enabled_contexts = get_option('enabled_contexts');
     $current_screen_base = $current_screen->base;
     global $hook_suffix;
-  
+  error_log(print_r($current_screen, true));
 
-    $allowed_screen_bases = ['post', 'edit', 'term', 'edit-tags'];
+        $allowed_screen_bases = ['post', 'edit', 'term', 'edit-tags'];
+            $custom_fields_for_pages = get_option('enable_custom_fields_for_pages', '0');
+                 if ($custom_fields_for_pages ==="1"){
+                   add_meta_box('side_image_fields_page', 'Page Images', 'da_render_images_for_pages', 'page', 'side', 'default');
+                   add_meta_box('section_fields_page', 'Post Fields', 'render_da_pages_metabox', 'page', 'normal', 'default');
+                   add_action('save_post_page', 'dibraco_save_section_fields_page');
+                }
         
-    wp_enqueue_style('common-fields-style', AWESOME_SERVICES_URL . 'css/da-common-fields.css');
-    wp_enqueue_script('da-repeater', AWESOME_SERVICES_URL . 'js/da-repeater.js', ['jquery'], false, true);
-    wp_enqueue_script('media-fields-images-terms-script', AWESOME_SERVICES_URL . 'js/da-media-fields-images-terms.js', ['jquery', 'editor', 'media-views'], null, true);
-    wp_enqueue_script('da-conditional-fields', AWESOME_SERVICES_URL . 'js/da-conditional-fields.js', ['jquery'], false, true);
-    if (in_array($current_screen_base, $allowed_screen_bases)) {
-    
+        if (in_array($current_screen_base, $allowed_screen_bases)) {
+            $all_post_types = array_column($enabled_contexts, 'post_type');
+            $all_taxonomies = array_column($enabled_contexts, 'taxonomy');
 
-        foreach ($enabled_contexts as $context => $context_data) {
-            $context_name  = $context_data['context_name'];
-            $context_type  = $context_data['context_type'];
-            $post_type     = $context_data['post_type'];
-            
-             $taxonomies_for_edit_posts = [];
-             if (($hook_suffix === 'post-new.php' || $hook_suffix === 'post.php') && $current_screen->post_type === $post_type){
-                if (!$current_screen->is_block_editor()) {
-                $scripts=['wp-color-picker', 'media', 'jquery-ui-slider', 'jquery-ui-sortable', 'media-views', 'postbox','wp-util', 'plugins', 'wp-edit-post'];
-               foreach ($scripts as $script_handle) {
-                wp_enqueue_script($script_handle);
-               }
+           if ((in_array($current_screen->post_type, $all_post_types) || (in_array($current_screen->taxonomy, $all_taxonomies)))){
+                   $post_type = $current_screen->post_type;
+                   $taxonomy = $current_screen->taxonomy;
+                wp_enqueue_style('common-fields-style', AWESOME_SERVICES_URL . 'css/da-common-fields.css');
+                if ($hook_suffix !== 'edit-tags.php' && $hook_suffix !== 'edit.php'){
+                     wp_enqueue_script('editor');
+                    wp_enqueue_media();
+                    wp_enqueue_script('wp-components');
+                    wp_enqueue_script('wp-tinymce');
+                    wp_enqueue_script('wplink');
+                    wp_enqueue_script('wp-element');
+                    wp_enqueue_script('wp-data');
+                    wp_enqueue_script('wp-blocks');
+                    wp_enqueue_script('jquery-ui-sortable');
+                    wp_enqueue_script('media-views');
+                    wp_enqueue_script('media-editor');
+                    wp_enqueue_script('da-color-picker2', AWESOME_SERVICES_URL . 'js/da-color-picker2.js', ['jquery', 'wp-color-picker', 'jquery-ui-slider'], false, true);
+                    wp_enqueue_script('da-repeater', AWESOME_SERVICES_URL . 'js/da-repeater.js', ['jquery'], false, true);
+                     wp_enqueue_script('media-fields-images-terms-script', AWESOME_SERVICES_URL . 'js/da-media-fields-images-terms.js', ['jquery', 'editor', 'media-editor'], null, true);
+                    wp_enqueue_script('da-conditional-fields', AWESOME_SERVICES_URL . 'js/da-conditional-fields.js', ['jquery'], false, true);
                 }
-             }
-            if($context_type ==='unique'){
-                    $related_connectors = $context_data['related_connectors'];
-                  foreach ($related_connectors as $related_connector => $related_data) {
-                    $related_taxonomy = $related_data['taxonomy'];
-                    $related_connector_name = $related_data['connector_name'];
-                    $taxonomies_for_edit_posts[$related_connector_name] = $related_taxonomy;
+                     if ($hook_suffix === 'post-new.php' || $hook_suffix === 'post.php'){
+                        foreach ($all_taxonomies as $tax) {
+                            if ($current_screen->is_block_editor()) {
+                                wp_enqueue_script('lodash');
+                                $panel_id = "taxonomy-panel-{$tax}";
+                                $script = "wp.data.dispatch('core/editor').removeEditorPanel('{$panel_id}');";
+                                wp_add_inline_script('wp-editor', $script);
+                                 remove_meta_box("{$tax}div", $post_type, 'side');
+                                 remove_meta_box("tagsdiv-{$tax}", $post_type, 'side');
+                            } else {
+                                remove_meta_box("{$tax}div", $post_type, 'side');
+                                remove_meta_box("tagsdiv-{$tax}", $post_type, 'side');
+                                }
+                            }
+                        add_meta_box("dibraco_render_side_meta_box", 'Taxonomies & images', 'dibraco_render_side_meta_box', $post_type, 'side', 'high', ['__block_editor_compatible_meta_box' => true]);
+                        add_meta_box("dibraco_post_normal_meta_box", 'Post Fields', 'dibraco_render_normal_meta_box', $post_type, 'normal', 'default', ['__block_editor_compatible_meta_box' => true]  );
+                        add_action("save_post_{$post_type}", 'dibraco_save_meta_box', 10, 3);
+                    }
                 }
-
-                if ($hook_suffix === 'edit.php' && $_GET['post_type'] === $post_type) {
-                         wp_enqueue_script( 'dibraco-quick-edit', AWESOME_SERVICES_URL . 'js/da-quickedits.js', ['jquery', 'inline-edit-post'], null, true );
+             foreach ($enabled_contexts as $context => $context_data) {
+                     $current_screen_post_type = $current_screen->post_type;
+                     $current_screen_taxonomy = $current_screen->taxonomy;
+                     $context_name  = $context_data['context_name'];
+                     $context_type  = $context_data['context_type'];
+                     $post_type = $context_data['post_type'];
+                      $taxonomies_for_edit_posts = [];
+                     if ($context_type !== 'unique') {
+                       $taxonomy = $context_data['taxonomy'];
+                       $taxonomies_for_edit_posts[$context_name] = $taxonomy;
+                     }
+                    if($context_type ==='unique' || $context_type ==='type'){
+                        $related_connectors = $context_data['related_connectors'];
+                        foreach ($related_connectors as $related_connector => $related_data) {
+                            $related_taxonomy = $related_data['taxonomy'];
+                            $related_connector_name = $related_data['connector_name'];
+                            $taxonomies_for_edit_posts[$related_connector_name] = $related_taxonomy;
+                           }
+                    }
+                    if ($hook_suffix === 'edit.php' && $current_screen_post_type === $post_type) {
+                        wp_enqueue_script( 'dibraco-quick-edit', AWESOME_SERVICES_URL . 'js/da-quickedits.js', ['jquery', 'inline-edit-post'], null, true );
                         setup_type_edit_screen($post_type, $taxonomies_for_edit_posts);
-                }
-                 if (($hook_suffix === 'post-new.php' || $hook_suffix === 'post.php') && $current_screen->post_type === $post_type){
-
-                add_meta_box("dibraco_render_side_meta_box", 'Taxonomies & images', 'dibraco_render_side_meta_box', $post_type, 'side', 'high');
-                add_meta_box("dibraco_post_normal_meta_box", 'Post Fields', 'dibraco_render_normal_meta_box', $post_type, 'normal', 'default');
-                add_action("save_post_{$post_type}", 'dibraco_save_meta_box', 10, 3);
-                }
-            }
-            if ($context_type !== 'unique') {
-                $taxonomy = $context_data['taxonomy'];
-            }
-           if ($context_type ==='connector'){
-               if ($context_name ==='locations'){
-                    wp_enqueue_style('locations-company-info-style', AWESOME_SERVICES_URL . 'css/locations_company_info.css');
+                    }
+                     if($context_name ==='jobs' && $current_screen_post_type === $post_type){
+                        wp_enqueue_style('job-postings-style', AWESOME_SERVICES_URL . 'css/da-job-postings.css');
+                        add_meta_box('job_meta_box', 'Jobs Custom Fields', 'display_job_meta_box', $post_type, 'normal', 'high');
+                        add_action("save_post_{$post_type}", function($post_id) {
+                        save_job_meta_box_data($post_id);
+                         }, 10, 1);
+                     }
+           if ($context_type === 'connector'){
+               if ($context_name ==='locations' && ($hook_suffix !== 'edit.php') && ($current_screen_post_type === $post_type || $current_screen_taxonomy === $taxonomy)){
+                   wp_enqueue_style('locations-company-info-style', AWESOME_SERVICES_URL . 'css/locations_company_info.css');
                    wp_enqueue_script('awesome-hours-of-operation-script', AWESOME_SERVICES_URL . 'js/da-hours-operation.js', ['jquery'], false, true);
                }
-                 $taxonomies_for_edit_posts[$context_name] = $taxonomy; 
-                 if ($hook_suffix === 'edit.php' && $_GET['post_type'] === $post_type) {
-                         wp_enqueue_script( 'dibraco-quick-edit', AWESOME_SERVICES_URL . 'js/da-quickedits.js', ['jquery', 'inline-edit-post'], null, true );
-                        setup_type_edit_screen($post_type, $taxonomies_for_edit_posts);
-                }
-                if (($hook_suffix === 'post-new.php' || $hook_suffix === 'post.php') && $current_screen->post_type === $post_type){
-                      if ($current_screen->is_block_editor()) {
-                            $panel_id = "taxonomy-panel-{$taxonomy}";
-                            $script = "wp.data.dispatch('core/editor').removeEditorPanel('{$panel_id}');";
-                            wp_add_inline_script('wp-edit-post', $script);
-                      } else {
-                            remove_meta_box("{$taxonomy}div", $post_type, 'side');
-                            remove_meta_box("tagsdiv-{$taxonomy}", $post_type, 'side');
-                      }
-                         add_meta_box("dibraco_render_side_meta_box", 'Taxonomies & images', 'dibraco_render_side_meta_box', $post_type, 'side', 'high');
-                         add_meta_box("dibraco_post_normal_meta_box", 'Post Fields', 'dibraco_render_normal_meta_box', $post_type, 'normal', 'default');
-                         add_action("save_post_{$post_type}", 'dibraco_save_meta_box', 10, 3);
-                }
-                
-                if ($hook_suffix === 'term.php' && $_GET['taxonomy'] ===$taxonomy){
+               if (($hook_suffix === 'term.php') && $current_screen->taxonomy === $taxonomy){
+                    error_log('context_name: ' . $context_name);
                     if($context_name ==='locations'){
                         add_action("{$taxonomy}_edit_form_fields", 'render_location_meta_box', 20, 2);
                         add_action("edited_{$taxonomy}", function($term_id) use ($taxonomy) {
-                        handle_save_location_term_meta($term_id, $taxonomy);}, 25, 1);
-                    }
+                        handle_save_location_term_meta($term_id, $taxonomy);}, 25, 1);} 
                     if ($context_name ==='service_areas'){
-                        add_action("{$taxonomy}_edit_form_fields", 'render_service_area_meta_box', 10, 2);
-                        add_action("edited_{$taxonomy}", function($term_id) use ($taxonomy) {
-                        handle_save_service_area_term($term_id, $taxonomy);}, 10, 1 );
-                    }
+                      add_action("{$taxonomy}_edit_form_fields", 'render_service_area_meta_box', 10, 2);
+        
+                        }
                 }
-            
-            if ($hook_suffix ==='edit-tags.php' && $_GET['taxonomy'] === $taxonomy){
+               if (($hook_suffix ==='edit-tags.php') && $current_screen->taxonomy === $taxonomy){
                 $related_type_contexts = $context_data['related_type_contexts'];
+                         if ($context_name ==='service_areas')  {
+                         add_action("saved_{$taxonomy}", function($term_id) use ($taxonomy) {
+                        handle_save_service_area_term($term_id, $taxonomy);
+                         }, 10, 1);} 
                 add_action("created_{$taxonomy}", function($term_id) use($related_type_contexts, $taxonomy) {
                 setup_related_type_terms_for_new_connector_term($term_id, $related_type_contexts, $context_name, $taxonomy);}, 11, 1);
                  if (get_option('locations_areas_status')==='both') { 
@@ -1218,122 +1164,48 @@ add_action('current_screen', function ($current_screen) {
                     add_action("{$taxonomy}_add_form_fields", function($taxonomy) {
                     render_locations_connection_radio_for_area_terms(null, $taxonomy);
                     }, 10, 1);
+               
+                        }
                     }    
-                }
-            }
+               }
            }
            if ($context_type === 'type') {
-                if($context_name ==='jobs'){
-                      wp_enqueue_style('job-postings-style', AWESOME_SERVICES_URL . 'css/da-job-postings.css');
-                }
-                $post_per_term      = $context_data['post_per_term'];
-                $related_connectors = $context_data['related_connectors'];
-                $taxonomies_for_edit_posts[$context_name] = $taxonomy; 
-                foreach ($related_connectors as $related_connector => $related_data) {
-                    $related_taxonomy = $related_data['taxonomy'];
-                    $related_connector_name = $related_data['connector_name'];
-                    $taxonomies_for_edit_posts[$related_connector_name] = $related_taxonomy;
-                }
-                if ($hook_suffix === 'edit.php' && $_GET['post_type'] === $post_type) {
-                    wp_enqueue_script( 'dibraco-quick-edit', AWESOME_SERVICES_URL . 'js/da-quickedits.js', ['jquery', 'inline-edit-post'], null, true );
-                    setup_type_edit_screen($post_type, $taxonomies_for_edit_posts);
-                }
-                 if (($hook_suffix === 'post-new.php' || $hook_suffix === 'post.php') && $current_screen->post_type === $post_type){
-                     foreach ($taxonomies_for_edit_posts as $context_name => $taxonomy) {
-                        if ($current_screen->is_block_editor()) {
-                            $panel_id = "taxonomy-panel-{$taxonomy}";
-                            $script = "wp.data.dispatch('core/edit-post').removeEditorPanel('{$panel_id}');";
-                            wp_add_inline_script('wp-edit-post', $script);
-                        }  else {
-                        remove_meta_box("{$taxonomy}div", $post_type, 'side');
-                        remove_meta_box("tagsdiv-{$taxonomy}", $post_type, 'side');
-                        }
-                    } 
-                          add_meta_box("dibraco_render_side_meta_box", 'Taxonomies & images', 'dibraco_render_side_meta_box', $post_type, 'side', 'high');
-                         add_meta_box("dibraco_post_normal_meta_box", 'Post Fields', 'dibraco_render_normal_meta_box', $post_type, 'normal', 'default');
-                         add_action("save_post_{$post_type}", 'dibraco_save_meta_box', 10, 3);
-                 }
+                $post_per_term = $context_data['post_per_term'];
                 if ($hook_suffix === 'term.php' && $_GET['taxonomy'] === $taxonomy) {
-                    add_action("{$taxonomy}_edit_form_fields", function ($term) {
+                      add_action("{$taxonomy}_edit_form_fields", function ($term) {
                         render_dibraco_type_term_fields($term->term_id);
-                    });
-                    add_action('edited_term', function ($term_id) {
+                        });
+                        add_action('edited_term', function ($term_id) {
                         save_dibraco_type_term_fields($term_id);
-                    });
-                }
-                if ($post_per_term !== '1') {
+                        });
+                    }
+                if ($post_per_term !== '1' && $hook_suffix === 'edit-tags.php') {
                     add_action("created_{$taxonomy}", function ($term_id) use ($context_data) {
-                    setup_brand_new_type_term_no_ppt($term_id, $context_data);
+                        setup_brand_new_type_term_no_ppt($term_id, $context_data);
                     }, 10, 1);
                 }
             }
         }
 
         error_log('Success! Running code on screen base: ' . $current_screen_base);
-    }
-});
-
-global $hook_suffix;
-if (isset($hook_suffix) && in_array($hook_suffix, ['edit-tags.php', 'edit.php', 'term.php', 'post.php', 'post-new.php'])) { 
-    error_log($hook_suffix);
-    $custom_fields_for_pages = get_option('enable_custom_fields_for_pages', '0');
-    if ($custom_fields_for_pages ==="1"){
-        add_meta_box('side_image_fields_page', 'Page Images', 'da_render_images_for_pages', 'page', 'side', 'default');
-        add_meta_box('section_fields_page', 'Post Fields', 'render_da_pages_metabox', 'page', 'normal', 'default');
-        add_action('save_post_page', 'dibraco_save_section_fields_page');
-    }
-    $status = get_option('locations_areas_status');
-    $enabled_contexts = get_option('enabled_contexts');
-    if (empty($enabled_contexts)) return;
-
-    foreach ($enabled_contexts as $context => $context_data) {
-      
-        $context_type = $context_data['context_type'];
-        $post_type = $context_data['post_type'];
-        $context_name = $context_data['context_name'];
-
-
-        if($context_name !=='jobs'){
-        do_action("dibraco_render_side_meta_box", $post_type, 'side', 'high');
-        do_meta_box("dibraco_post_normal_meta_box", 'Post Fields', 'dibraco_render_normal_meta_box', $post_type, 'normal', 'default');
-        add_action("save_post_{$post_type}", 'dibraco_save_meta_box', 10, 3);
         }
+    });
 
-
-           
-    
-    if($context_name ==='jobs'){
-             add_meta_box('job_meta_box', 'Jobs Custom Fields', 'display_job_meta_box', $post_type, 'normal', 'high');
-             add_meta_box("dibraco_post_side_meta_box", 'Taxonomies and Images', "dibraco_render_side_meta_box", $post_type, 'side', 'high');
-             add_meta_box("dibraco_post_normal_meta_box", 'Post Fields', 'dibraco_render_normal_meta_box', $post_type, 'normal', 'default');
-             add_action("save_post_{$post_type}", 'dibraco_save_meta_box', 10, 3);
-             add_action("save_post_{$post_type}", 'save_job_meta_box_data', 20);
-          
-            }
-    
-        }
-    };
 
 
 
 function setup_brand_new_type_term_no_ppt($new_type_term_id, $context){
-$type_taxonomy = $context['taxonomy'];
 $context_name = $context['context_name'];
 $meta_key = "related_type_{$context_name}";
-$related_connectors =$context['related_connectors'];
-$new_type_term_id = (int)$new_type_term_id;
-    if($related_connectors !==[]){
-       foreach ($related_connectors as $related_connector_name => $related_data){
-            $connector_taxonomy = $related_data['taxonomy'];
-            $connector_terms = get_terms(['taxonomy' => $connector_taxonomy, 'hide_empty' => false, 'fields' => 'ids']);
-            foreach($connector_terms as $connector_term_id){
-                $connector_term_id =(int)$connector_term_id;
-                $existing_meta = get_term_meta($connector_term_id, $meta_key, true);
+$related_connectors = $context['related_connectors'];
+  foreach ($related_connectors as $related_connector_name => $related_data){
+    $connector_taxonomy = $related_data['taxonomy'];
+    $connector_terms = get_terms(['taxonomy' => $connector_taxonomy, 'hide_empty' => false, 'fields' => 'ids']);
+        foreach($connector_terms as $connector_term_id){
+            $existing_meta = get_term_meta($connector_term_id, $meta_key, true);
                 $existing_meta[$new_type_term_id] = []; 
                 update_term_meta($connector_term_id, $meta_key, $existing_meta);
             }
-        
-        }
     }
 }
 
@@ -1524,13 +1396,13 @@ if ($related_connectors_count === 2) {
             }
  function save_related_connector_terms_to_unique($post_id, $context_data, $related_connectors) {
     $context_name = $context_data['context_name'];
-    $meta_key     = "related_unique_{$context_name}";
-    $post_title   = get_the_title($post_id);
-    $post_url     = get_permalink($post_id);
+    $meta_key = "related_unique_{$context_name}";
+    $post_title  = get_the_title($post_id);
+    $post_url = get_permalink($post_id);
     foreach ($related_connectors as $connector_key => $connector_data) {
-        $taxonomy        = $connector_data['taxonomy'];
-        $current_term_id = dibraco_get_current_term_id_for_post($post_id, $taxonomy);
-        $new_term_id     = (int)$_POST["{$taxonomy}_term"];
+        $related_connector_taxonomy = $related_connector_data['taxonomy'];
+        $current_term_id = dibraco_get_current_term_id_for_post($post_id, $related_connector_taxonomy);
+        $new_term_id = (int)$_POST["{$taxonomy}_term"];
         if ($new_term_id === $current_term_id) {
             continue;
         }
@@ -1544,11 +1416,10 @@ if ($related_connectors_count === 2) {
             $new_meta = get_term_meta($new_term_id, $meta_key, true);
             $new_term_id = (int)$new_term_id;
             $new_meta[$post_id] = [
-                'related_post_id'    => $post_id,
+                'related_post_id' => $post_id,
                 'related_post_title' => $post_title,
                 'related_post_url'   => $post_url,
             ];
-
             update_term_meta($new_term_id, $meta_key, $new_meta);
         }
         wp_set_object_terms($post_id, $new_term_id, $taxonomy, false);
@@ -1722,10 +1593,8 @@ function render_dibraco_admin_table($table) {
 }
 function render_context_tables($contexts, $context_type, $current_connector_term_id) {
     $prepare_function_name = "prepare_single_{$context_type}_table_data";
-
     foreach ($contexts as $context_name => $context_data) {
         $table_data = $prepare_function_name($context_name, $context_data, $current_connector_term_id);
-        
         if ($table_data) {
             render_dibraco_admin_table($table_data);
         }

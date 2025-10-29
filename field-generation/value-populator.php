@@ -37,17 +37,22 @@ function dibraco_condition_checker($field_template, $saved_data){
 }
 
 function dibraco_extract_nested_arrays_test($fields) {
+    
     $field_names = [];
     $standard_fields = [
         'text', 'textarea', 'date', 'time', 'colorpicker', 'image', 'number',
         'toggle', 'select', 'radio', 'checkbox', 'wysiwyg', 'hidden',
-        'radioIntegers', 'checkbox_group', 'no-edit'
+        'radioIntegers', 'no-edit'
     ];
     $repeating_containers =['repeater'];
+    $checkbox_container = ['checkbox_group'];
     $visual_containers = ['visual_section', 'field_group', 'visual_group', 'visual_split'];
     $functional_containers = ['group'];
     $ui_only_types = ['button', 'ui_only'];
    foreach ($fields as $field_name => $field_config) {
+       if (isset($field_config['ui_only'])){
+           continue;
+       }
         $field_type = $field_config['type']; 
         if (in_array($field_type, $standard_fields, true)) {
             $field_names[$field_name] = $field_name;
@@ -61,46 +66,21 @@ function dibraco_extract_nested_arrays_test($fields) {
     foreach ($subfields as $subfield_name => $subfield_config) {
         if (in_array($subfield_config['type'], $ui_only_types, true)) {
             continue;
-        }
+            }
         if (in_array($subfield_config['type'], $standard_fields, true)) {
             $field_names["{$field_name}_{$subfield_name}"] = "{$field_name}_{$subfield_name}";
             continue;
-        }
-    }   
-}
-        if ($field_type === 'repeater') {
-            $subfields = $field_config['fields'];
-            $subnames = []; 
-            $subnames["{$field_name}_row_count"] = "{$field_name}_row_count";
-            $index = "[{$field_name}_row_count]";
-            foreach ($subfields as $subfield_name => $subfield_config) {
-                if (in_array($subfield_config['type'], $ui_only_types, true)) {
-                    continue;
-                }
-                if (in_array($subfield_config['type'], $standard_fields, true)) {
-                    $subnames[] = "{$field_name}{$index}[{$subfield_name}] => {$subfield_name}";
-                    continue;
-                }
-                if ($subfield_config['type'] === 'group') {
-                    foreach ($subfield_config['fields'] as $group_subfield_name => $group_subfield_config) {
-                        if (in_array($group_subfield_config['type'], $ui_only_types, true)) {
-                            continue;
-                        }
-                        $subfield_name = "[$index]{$subfield_name}_{$group_subfield_name}";
-                        $subnames[$subfield_name] = $subfield_name;
-                    }
-                    continue;
-                }
-                if ($subfield_config['type'] === 'repeater') {
-                    $nested = dibraco_extract_nested_arrays_test([$subfield_name => $subfield_config]);
-                    $subnames = array_merge($subnames, $nested);
-                    continue;
-                }
             }
-           
-            $field_names[$field_name] = $subnames;
-            continue;
-        }
+        }   
+    }
+
+if ($field_type === 'repeater') {
+     $field_names["{$field_name}_row_count"] = "{$field_name}_row_count"; 
+    $field_names[$field_name] = 'repeater';
+    unset($fields[$field_name]);
+    continue;
+}
+       
         
         if (in_array($field_type, $visual_containers, true)) {
             $subfields = $field_config['fields'];
@@ -110,7 +90,12 @@ function dibraco_extract_nested_arrays_test($fields) {
                 $field_names[$field_name] = $nested;
                 continue;
             }
-            
+            if ($field_type === 'repeater') {
+                    $field_names["{$field_name}_row_count"] = "{$field_name}_row_count"; 
+                    $field_names[$field_name] = 'repeater';
+                    unset($fields[$field_name]);
+                    continue;
+                }
             $nested = dibraco_extract_nested_arrays_test($subfields);
             foreach ($nested as $nested_name => $nested_value) {
                 $field_names[$nested_name] = $nested_value;
@@ -119,21 +104,6 @@ function dibraco_extract_nested_arrays_test($fields) {
     }
     
     return $field_names;
-}
-
-function dibraco_save_repeater_fields($repeater_field, $subfields, $repeater_meta_or_option_values, $save_to_term_options_post){
-            $row_count = (int)$post_data["{$field_name}_row_count"];
-            
-            
-        if ($meta_type === 'term') {
-        update_term_meta($term_id, $repeater_field, $rows);
-} elseif ($save_type === 'post') {
-        update_post_meta($post_id, "{$repeater_field}_row_count", $row_count);
-        update_post_meta($object_id, $repeater_field, $rows);
-    } elseif ($save_type === 'option') {
-        update_option("{$repeater_field}_row_count", $row_count);
-        update_option($repeater_field, $rows);
-    }
 }
 
 

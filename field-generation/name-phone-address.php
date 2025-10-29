@@ -91,10 +91,76 @@ return [
     'state' =>['type' => 'text'],
     'latitude' => ['type' => 'text'],
     'longitude' => ['type' => 'text'],
-    'bounding_box' => ['type' => 'text'],
+    'bounding_box' => ['type' => 'text'], 
+    'menu_item_repeater' => [
+            'type' => 'repeater', 
+            'fields' => [ 
+                'dish_name' => ['type' => 'text'],
+                'description' => ['type' => 'textarea', 'rows' => 3],
+                'image' => ['type' => 'image'],
+                'price' => ['type' => 'number', 'step' => "0.01"],
+                'has_sizes' => ['type' => 'toggle', 'label' => 'Multiple Sizes?', 'value' => '0'],
+                'size' => [
+                'type' => 'group',
+                'condition' => ['field' => 'has_sizes', 'values' => ['1']],
+                'fields' => [
+                'small_price' => ['type' => 'number', 'step' => '0.01'],
+                'small_portion' => ['type' => 'text'],
+                'regular_price' => ['type' => 'number', 'step' => '0.01'],
+                'regular_portion' => ['type' => 'text'],
+                'large_price' => ['type' => 'number', 'step' => '0.01'],
+                'large_portion' => ['type' => 'text']],
+                    ],
+                'diet_vegan' => ['type' => 'checkbox', 'label' => 'Vegan', 'value' => '0'],
+                'diet_vegetarian' => ['type' => 'checkbox', 'label' => 'Vegetarian', 'value' => '0'],
+                'diet_kosher' => ['type' => 'checkbox', 'label' => 'Kosher', 'value' => '0'],
+                'diet_halal' => ['type' => 'checkbox', 'label' => 'Halal', 'value' => '0'],
+                'calories' => ['type' => 'number', 'label' => 'Calories'],
+                'protein' => ['type' => 'number', 'label' => "Protein (g)"],
+                'fat' => ['type' => 'number', 'label' => "Fat (g)"]
+            ]
+            ]
+   ];
+}
+function get_repeater_restaurant_menu(){
+    return [
+       'menu_item_repeater' => [
+            'type' => 'repeater', 
+            'fields' => [ 
+                'dish_name' => ['type' => 'text'],
+                'description' => ['type' => 'textarea', 'rows' => 3],
+                'image' => ['type' => 'image'],
+                'price' => ['type' => 'number', 'step' => "0.01"],
+                'has_sizes' => ['type' => 'toggle', 'label' => 'Multiple Sizes?', 'value' => '0'],
+                'size' => [
+                'type' => 'group',
+                'condition' => ['field' => 'has_sizes', 'values' => ['1']],
+                'fields' => [
+                'small_price' => ['type' => 'number', 'step' => '0.01'],
+                'small_portion' => ['type' => 'text'],
+                'regular_price' => ['type' => 'number', 'step' => '0.01'],
+                'regular_portion' => ['type' => 'text'],
+                'large_price' => ['type' => 'number', 'step' => '0.01'],
+                'large_portion' => ['type' => 'text']],
+                    ],
+                'diet_vegan' => ['type' => 'checkbox', 'label' => 'Vegan', 'value' => '0'],
+                'diet_vegetarian' => ['type' => 'checkbox', 'label' => 'Vegetarian', 'value' => '0'],
+                'diet_kosher' => ['type' => 'checkbox', 'label' => 'Kosher', 'value' => '0'],
+                'diet_halal' => ['type' => 'checkbox', 'label' => 'Halal', 'value' => '0'],
+                'calories' => ['type' => 'number', 'label' => 'Calories'],
+                'protein' => ['type' => 'number', 'label' => "Protein (g)"],
+                'fat' => ['type' => 'number', 'label' => "Fat (g)"]
+            ]
+        ]
     ];
 }
- 
+ function get_repeater_field_list(){
+ return [
+        'da_list_title' => ['type' => 'text', 'label' => 'List Title'], 
+        'da_list_repeater' => ['type' => 'repeater', 'fields' => [ 
+            'item' => ['type' => 'textarea', 'label'=> 'item', ],
+        ]]]; 
+}
 function get_banner_fields(){
     return  [
     'da_main_h1'            => ['label' => 'Main H1', 'type' => 'text', 'pair' => '1'],
@@ -131,13 +197,6 @@ function get_section_title_fields() {
     ];
 }
 
-function get_repeater_field_list(){
- return [
-        'da_list_title' => ['type' => 'text', 'label' => 'List Title', 'pair' => '1'], 
-        'da_list_repeater' => ['type' => 'repeater', 'fields' => [ 
-            'item' => ['type' => 'textarea', 'pair_end'=>'1', 'label'=> 'item', ],
-        ]]]; 
-}
 
 function get_employee_fields($certification_enabled ="0"){
     $fields = [

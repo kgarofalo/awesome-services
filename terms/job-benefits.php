@@ -1,27 +1,32 @@
 <?php
 
 function get_global_benefit_fields() {
- $default_benefit_field_names = ['health_benefits', 'paid_time_off', 'retirement_plan', 'flexible_schedule', '401_k', 'tuition_reimbursement'];
+ $default_benefit_field_names = ['health_benefits', 'paid_time_off', 'medical', 'flexible_schedule', '401k', 'tuition_reimbursement'];
 
  $field_names =  get_option('global_benefits', []);
   if (empty($field_names)){    
-    $field_names = $default_benefit_field_names;
-  }
+      foreach ($default_benefit_field_names as $benefit_name){
+          $field_names[$benefit_name] = $benefit_name;
+      }
+     }
    $fields = [];
     foreach ($field_names as $field_name) {
+    foreach ($field_names as $field_name => $also_field_name) {
         $field_config = ['type' => 'checkbox', 'value' => '0'];
        $fields[$field_name] = $field_config;
     }
     return $fields;
 }
 function render_global_benefits_page() {
-  $default_benefit_field_names = ['health_benefits', 'paid_time_off', 'retirement_plan', 'flexible_schedule', '401_k', 'tuition_reimbursement'];
+  $default_benefit_field_names = ['health_benefits', 'paid_time_off', 'medical', 'flexible_schedule', '401k', 'tuition_reimbursement'];
 
   $option_key = 'global_benefits';
   $field_names =  get_option($option_key, []);
-    if (empty($field_names)){    
-    $field_names = $default_benefit_field_names;
-    }
+      if (empty($field_names)){    
+      foreach ($default_benefit_field_names as $benefit_name){
+          $field_names[$benefit_name] = $benefit_name;
+      }
+     }
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_POST['add'])) {
             $new_field_name = strtolower(str_replace(' ', '_', sanitize_text_field( $_POST['new_job_benefit_field'])));

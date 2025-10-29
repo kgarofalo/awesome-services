@@ -56,18 +56,16 @@
 .dibraco-wysiwyg {
     display:flex;
     flex-direction:column;
+    min-height: 300px;
 }
 .dibraco-wysiwyg label {
     display:flex;
 }
-.mce-i-phone::before {
-    font-family: 'dashicons' !important;
-    content: '\f525';
+
+.dibraco-wysiwyg textarea {
+     min-height: 260px;
 }
-   .mce-i-piglet::before {
-            font-family: 'dashicons' !important;
-            content: '\f231'; 
-        }
+
 .no-edits-sa{
  display:flex;
  flex-direction:row;
@@ -77,26 +75,28 @@ padding: 10px;
 gap: 10px;
 background-color: #6299ff42;
 }
-.no-edits-sa .dibraco-no-edit p{
- font-size:1.2em;
-}
-#pairs_template .section-fields {
+
+#pairs_template {
   display:flex;
   flex-wrap:wrap;
-  justify-content:space-between;
-  width:100%;
 }
-#pairs_template .dibraco-pair .dibraco-text {
-width:100%;
-}
-#pairs_template .dibraco-pair {
+
+#pairs_template .dibraco-section-fields  {
   display:flex;
-  flex-direction:column;
-  width:47%;
+  justify-content: space-between;
+flex-wrap:wrap;
+    
 }
+#pairs_template .dibraco-section-fields .dibraco-pair {
+    display:flex;
+    flex-direction:column;
+    width:48%;
+}
+
 #da_list_repeater .repeater-row{
 	width:100%;
-	display:block;
+	display:flex;
+	flex-direction:column;
 }
 
 #main_service_form .dibraco-split {
@@ -114,7 +114,41 @@ width:100%;
 #main_service_form .split-group {
     display:block;
 }
+#menu_item_repeater .repeater-row {
+    background: #f6f7f7;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-left: 3px solid #2271b1;
+}
 
+
+
+#menu_item_repeater .remove-row {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #ddd;
+    text-align: right;
+}
+
+#menu_item_repeater .remove-row-button {
+    background: #b32d2e;
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    cursor: pointer;
+}
+
+#menu_item_repeater .remove-row-button.hidden {
+    display: none;
+}
+
+#menu_item_repeater .add-row-button {
+    background: #2271b1;
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    cursor: pointer;
+}
 /* -----------------------------------------
    2. Benefit Form & List
 ------------------------------------------ */
@@ -137,19 +171,9 @@ width:100%;
 .benefits-list button:hover {
   background-color: #005177;
 }
-#employee-fields .section-fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-}
 
-#employee-fields .section-fields .dibraco-text {
-  width: 19%;
-}
 
-#employee-fields .section-fields .dibraco-textarea {
-  width: 50%;
-}
+
 #certification_data {
 	display:flex;
 	flex-direction:row;
@@ -186,22 +210,15 @@ display: flex;
     
 }
 
-#service_area_section_fields .section-fields {
+#service_area_section_fields .dibraco-section-fields {
     display: flex;
     flex-direction:row;
     flex-wrap:wrap;
   align-items: center; 
         gap: 10px; 
 }
-#service_area_section_fields #dibraco_landscape_images {
-    flex-direction: column;
-    display: flex
-}
-#service_area_section_fields #dibraco_landscape_images > div  {
-    flex-direction: row;
-    display: flex
-}
-#service_area_section_fields .group-fields .dibraco-text{
+
+#service_area_section_fields .dibraco-group-fields .dibraco-text{
     width:18%;
 }
 /* -----------------------------------------
@@ -246,20 +263,18 @@ display: flex;
 .dibraco-number,
 .dibraco-no-edit {
   flex-direction:column;
+  width:100%;
   display:flex;
 }
-
-.dibraco-no-edit p {
- padding: 3px;
- font-size: 0.9em;
- border: 1px dashed #999;
- border-radius: 4px;
- background-color: #fff;
- color: #333;
- width: 100%;
- box-sizing: border-box;
- margin: 0;
- min-height: 1.5em;
+.dibraco-text label,
+.dibraco-textarea label,
+.dibraco-time label,
+.dibraco-date label,
+.dibraco-select label,
+.dibraco-number label,
+.dibraco-no-edit {
+  flex-direction:column;
+  display:flex;
 }
 
 /* CONSOLIDATED: All standard text-entry inputs share these styles */
@@ -380,39 +395,13 @@ input.button.button-small.wp-picker-default{
     margin-left: 0;
     margin-top: -4px; /* <-- ADDED: Centers the handle vertically */
     left: -1px;
-    z-index: 2; /* Ensure handle is on top of the gradient */
+    z-index: 2; 
     cursor: pointer;
 }
 /* -----------------------------------------
    3. Buttons
------------------------------------------- */
-/* CONSOLIDATED: Base style for all standard blue action buttons */
-.benefits-list button,
-.dibraco-repeater-wrapper .add-row-button,
-.dibraco-dibraco-repeater-wrapper .add-row-button {
- background-color: #0073aa;
- color: #fff;
- border: none;
- padding: 8px 12px;
- border-radius: 4px;
- cursor: pointer;
- font-size: 0.85em;
- transition: background-color 0.2s;
-}
 
-.benefits-list button:hover,
-.dibraco-repeater-wrapper .add-row-button:hover {
- background-color: #005177;
-}
 
-.dibraco-repeater-wrapper .remove-row-button {
-background-color: #d63638;
- margin-top: 10px;
-}
-
-.dibraco-repeater-wrapper .remove-row-button:hover {
- background-color: #a82a2a;
-}
 
 /* -----------------------------------------
    4. Radio Button Styling
@@ -457,38 +446,33 @@ background-color: #d63638;
 /* -----------------------------------------
    5. Toggle Switches
 ------------------------------------------ */
-.the-toggle {
+
+fieldset.dibraco-toggle legend {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom:5px;
+margin-left:5px;
+    
+}
+.the-toggle .toggle-input{
+    opacity:0;
+}
+fieldset.dibraco-toggle .the-toggle {
   position: relative;
   width: 60px;
   height: 30px;
+  margin-left:5px;
   border-radius: 30px;
   outline: 1px solid #000;
   box-shadow: -4px -3px 5px 1px #aa9090;
   display: block;
   overflow: hidden;
   user-select: none;
-  transition: transform 0.1s;
 }
-
-.the-toggle:active {
-  transform: scale(0.95);
-  box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
-}
-
-.dibraco-toggle fieldset legend {
-  font-size: 12px;
-  font-weight: 600;
-  margin-bottom:5px;
-  display: flex;
-  flex-direction:column;
-}
-
 .the-toggle .toggle-label {
-      opacity: 0;
   user-select: none;
   position: absolute;
   top: 0;
-  left: 0;
   width: 100%;
   height: 100%;
   display: flex;
@@ -500,7 +484,7 @@ background-color: #d63638;
   font-size: 0.9em;
   color: black;
   cursor: pointer;
-  z-index: 2;
+
   transition: all 0.5s ease;
 }
 
@@ -512,13 +496,11 @@ background-color: #d63638;
 
 .toggle-input.toggle-no:checked ~ .toggle-label.toggle-yes {
   opacity: 1;
-  transform: translateX(0);
   z-index: 3;
 }
 
 .toggle-input.toggle-yes:checked ~ .toggle-label.toggle-no {
   opacity: 1;
-  transform: translateX(0);
   z-index: 3;
   background-color: #DFA616;
 }
@@ -527,12 +509,6 @@ background-color: #d63638;
   opacity: 0;
   transform: translateX(-60px);
   z-index: 1;
-}
-
-.repeater-rows {
-    display: flex;
-    flex-wrap:wrap;
-    gap:20px
 }
 
 
@@ -547,35 +523,50 @@ background-color: #d63638;
     margin-top: 10px;
 }
 
-.add-row-button,
-.remove-button .remove-row-button {
+.benefits-list button,
+.dibraco-repeater-wrapper .add-row-button,
+.add-row-button {
     background-color: #0073aa;
     color: #fff;
     border: none;
-    padding: 5px 5px;
+    padding: 8px 12px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 0.95em;
+    font-size: 0.85em;
+    transition: background-color 0.2s;
     height: 30px;
-    width:100px;
+    width: 100px;
 }
 
-.add-row-button:hover,
-.repeater-row .remove-button .remove-row-button:hover {
+.benefits-list button:hover,
+.dibraco-repeater-wrapper .add-row-button:hover,
+.add-row-button:hover {
     background-color: #005177;
 }
 
-.remove-button .remove-row-button {
+.dibraco-repeater-wrapper .remove-row-button,
+.remove-row-button {
     background-color: #d63638;
-    margin-top: 10px; 
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    height: 30px;
+    width: 100px;
+    margin-top: 10px;
 }
 
-.remove-button  .remove-row-button:hover {
+.dibraco-repeater-wrapper .remove-row-button:hover,
+.remove-row-button:hover {
     background-color: #a82a2a;
 }
 
-
-
+/* Hidden button */
+.remove-row-button.hidden {
+    display: none;
+}
 .dibraco-image-field {
     display: flex;
     flex-direction: column;
@@ -583,8 +574,9 @@ background-color: #d63638;
     box-sizing: border-box;
     margin-bottom: 1em;
     min-width: 150px; 
-    max-width: 320px; /* Keep this for wider contexts */
+    max-width: 320px; 
 }
+
 .dibraco-image-field .buttons {
     display: flex;
     flex-wrap: wrap; 
@@ -593,49 +585,44 @@ background-color: #d63638;
     margin-top: 6px;
 }
 
-/* Individual buttons */
 .dibraco-image-field .buttons .button {
     min-width: 100px;
     width: 100%;
-    max-width:300px;
+    max-width: 300px;
     flex-basis: calc(50% - 3px);
     text-align: center;
 }
-/* Base label/title */
-.dibraco-image-field p {
-font-size: 14px;
-    font-weight: 500;
-    margin: 0 0 4px 0;
-    line-height: 1.4;
-    text-align: center;
-}
 
-.dibraco-image-field .image-preview-container {
+.dibraco-image-field .image-preview {
     border: 1px solid #ddd;
     background: #fafafa;
     overflow: hidden;
-    width: 100%; /* Fit container */
+    width: 100%; 
     box-sizing: border-box;
 }
-.dibraco-image-field .image-preview-container img.image-preview {
-    width: 100%; /* Changed */
-    height: auto; /* Changed */
-    max-width: 100%;
-    object-fit: contain;
-    display: block;
-}
-
 
 /* -----------------------------------------
    9. Miscellaneous
 ------------------------------------------ */
-#edittag .dibraco-admin-table .dibraco-before-after-container .repeater-rows{display:flex;flex-direction:row;gap:6px;flex-wrap:wrap;width:100%;}
-#edittag .dibraco-admin-table .dibraco-before-after-container .repeater-row{display:flex;flex-direction:row;flex-wrap:wrap;width:295px;gap:5px;}
-#edittag .dibraco-admin-table .dibraco-before-after-container .repeater-row .dibraco-image-field{max-width:48%;}
-#edittag .dibraco-admin-table .dibraco-before-after-container .repeater-row .remove-button{width:100%;max-width:600px;order:1;margin-top:10px;}
-#edittag .dibraco-admin-table .dibraco-portrait-images-container .dibraco-image-field,#edittag .dibraco-admin-table .dibraco-landscape-images-container .dibraco-image-field{display:flex;flex-direction:column;justify-content:space-between;width:calc(20% - 1%);}
-#edittag .dibraco-admin-table .dibraco-portrait-images-container .image-preview-container{aspect-ratio:3/4;}
-#edittag .dibraco-admin-table .dibraco-landscape-images-container .image-preview-container{aspect-ratio:16/9;}
+#edittag #dibraco_before_after {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+#edittag #dibraco_before_after .repeater-rows {
+    display: inline-flex;
+    flex-wrap: wrap;
+    flex-direction: row;
+    width: 100%;
+}
+#edittag #dibraco_before_after .repeater-row {
+    display: flex;
+    max-width: 46%;
+    flex-direction: row;
+}
+
+
+
 #dibraco_post_side_meta_box .dibraco-image-field{width:100%;max-width:100%;}
 #dibraco_post_side_meta_box .dibraco-image-field .image-preview{height:auto;}
 #dibraco_post_side_meta_box .dibraco-image-field .image-preview-container{max-width:100%;}

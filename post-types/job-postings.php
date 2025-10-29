@@ -46,7 +46,7 @@ function da_get_job_fields() {
     }
     
     $options = getJobPostingOptions();
-    $current_date = current_time('Y-m-d');
+    $current_date = current_time('m/d/Y');
 
 $job_details_fields = [
 	'type' => 'visual_section',
@@ -83,14 +83,13 @@ $compensation_fields = [
     ]
 ];
 
+
+
 $benefits = get_global_benefit_fields();
-$prefixed_benefits = [];
-foreach ($benefits as $name => $config) {
-    $prefixed_benefits["{$name}"] = $config;
+$benefit_fields=[];
+foreach($benefits as $benefit => $field_config){
+    $benefit_fields[$benefit] = $field_config;
 }
-
-
-
 $benefits_fields = [
 	'type' => 'visual_section',
 	'label' => 'Benefits',
@@ -99,7 +98,7 @@ $benefits_fields = [
 	    'job_benefits' => ['label' => 'Benefits Offered?', 'type' => 'toggle', 'value' => "0", 'option_labels' => ["1" => 'No', "0" => 'Yes']],
 		'select_job_benefits' => ['type' => 'visual_group',  'condition' => ['field' => 'job_benefits', 'values' => ["1"]],
 		'fields' => [
-		    'benefit' => ['label' => 'Available Benefits', 'type' => 'group', 'fields' => $prefixed_benefits], 
+		    'benefit' => ['label' => 'Available Benefits', 'type' => 'group', 'fields' => $benefit_fields], 
             'add_new_benefit' => ['type' => 'text', 'ui_only' => true],
             'confirm_add_new_benefit' => ['type' => 'button', 'label' => 'Add Benefit', 'class' => '']
 	    ]]]
@@ -136,7 +135,7 @@ $job_location_fields = [
 	'type' => 'visual_section',
 	'label' => 'Job Location',
 	'fields' => [
-        'job_location_type' => ['label' => 'Job Location Type', 'type' => 'select', 'value' => 'Place', 'options' => $options['location_types']],     
+        'job_location_type' => ['label' => 'Location Type', 'type' => 'select', 'value' => 'Place', 'options' => $options['location_types']],     
         'addresses' => ['label' => 'Choose an Address', 'type' => 'select', 'options' => $prepopulated_address_map, 'value' => '', 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']]],
         'street_address' => ['type' => 'text', 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']]],
         'street_address_2' => ['type' => 'text', 'condition' => ['field' => 'job_location_type', 'values' => ['Place', 'Place_TELECOMMUTE']]],
@@ -204,18 +203,23 @@ function display_job_meta_box($post) {
     $post_id = $post->ID; 
     $nonce = wp_create_nonce('dibraco_save_job_meta'); 
     $job_meta = get_post_meta($post_id, '_job_meta', true);
- 
+
     ?>
     <div class="job-meta-box">
         <input type="hidden" name="dibraco_job_meta_nonce" value="<?= esc_attr($nonce); ?>" />
         <?php
-            $array_keys = dibraco_extract_field_names_helper(da_get_job_fields());
+        error_log(print_r($job_meta,true));
         $job_fields_template = da_get_job_fields(); 
         $storage_keys=dibraco_extract_nested_arrays_test($job_fields_template);
+        error_log('storage_keys');
+        error_log(print_r($storage_keys,true));
+        $job_meta = maybe_unserialize($job_meta);
 
-
-        foreach($storage_keys as $container_name => $storage_array_key){
+    foreach($storage_keys as $container_name => $storage_array_key){
     if (is_array($storage_array_key)){
+        if ($storage_array_key === 'repeater') {
+            $mapped_value[$container_name] = $job_meta[$container_name];
+        }
         if (array_key_exists($container_name, $job_meta)){
          $job_meta = array_merge($job_meta,$job_meta[$container_name]); 
           $storage_keys = array_merge($storage_keys,$storage_keys[$container_name]);
@@ -225,7 +229,8 @@ function display_job_meta_box($post) {
             }
         }
     }    
-        $mapped_values = array_intersect_key($job_meta, $storage_keys);
+    $mapped_values = array_intersect_key($job_meta, $storage_keys);
+
 error_log(print_r($mapped_values,true));
         if (empty($job_meta)){
     echo FormHelper::generateVisualSection('job-details-form', ['fields' => $job_fields_template]);
@@ -258,8 +263,6 @@ jQuery(function($) {
 
     // DEBUG 2: Does jQuery find the button?
     var myButton = $('#confirm_add_new_benefit');
-    console.log('Button found by jQuery:', myButton);
-    console.log('Number of buttons found:', myButton.length)
     $('#confirm_add_new_benefit').on('click', function() {
         const benefitName = $('#add_new_benefit').val().trim();
         if (!benefitName) return;
@@ -290,70 +293,48 @@ function save_job_meta_box_data($post_id) {
     }
     $prepopulated_addresses = get_prepopulated_addresses();
     $job_fields_template = da_get_job_fields();
-    $all_valid_field_names = dibraco_extract_field_names_helper($job_fields_template);
-   
+    $current_meta_data = get_post_meta($post_id, '_job_meta', true);
     $meta_to_save = [];
-   foreach ($all_valid_field_names as $field_name) {
-       
 
-         if (substr($field_name, -9) === 'row_count') {
-                
-                $meta_to_save[$field_name] = $_POST[$field_name];
-                continue;
+    foreach ($_POST as $field_name => $value) {
+    
+    if (strpos($field_name, '_row_count') !== false) {
+                $repeater_name = str_replace('_row_count', '', $field_name);
+                $row_count = $value;
+                $repeater_data = $_POST[$repeater_name];
+           foreach (array_keys($current_meta_data) as $field_key) {
+             if (str_starts_with($field_key, $repeater_name)) {
+            unset($current_meta_data[$field_key]);
+            unset($job_fields_template[$repeater_name]);
             }
-            if (is_array($_POST[$field_name])) {
-                $flattened_data = FormProcessor::flatten_array($_POST[$field_name], $field_name);
-                foreach ($flattened_data as $flattened_name => $flattened_value) {
-                    $meta_to_save[$flattened_name] = $flattened_value;
-                }
-            } else {
-                $meta_to_save[$field_name] = $_POST[$field_name];
-            }
+        }
+        
+        $meta_to_save[$repeater_name] = $repeater_data;
+        $meta_to_save[$field_name] = $row_count;
+     }
     }
-
+   
+   
+    $storage_keys = dibraco_extract_nested_arrays_test($job_fields_template);
+   
+    foreach ($storage_keys as $container_name => $field_name) {
+        if (!is_array($field_name)) {
+            $meta_to_save[$field_name] = $_POST[$field_name];
+        }   
+        if (is_array($field_name)) {
+            foreach ($field_name as $nested_field => $nested_value) {
+                $meta_to_save[$container_name][$nested_field] = $_POST[$nested_field];
+            }
+         }
+    }
+        error_log(print_r($meta_to_save, true));
 
     $meta_to_save = dibraco_condition_checker($job_fields_template, $meta_to_save);
 
-    $post_type = get_post_type($post_id);
-    $valid_through_date_str = $meta_to_save['valid_through'];
-    $expiration_hook = 'dibraco_expire_job_post_event';
-    wp_clear_scheduled_hook($expiration_hook, [$post_id]);
-
-    if (!empty($valid_through_date_str)) {
-        $expiration_timestamp = strtotime($valid_through_date_str . ' +1 day');
-        $current_timestamp = time();
-
-        if ($expiration_timestamp > $current_timestamp) {
-            wp_schedule_single_event($expiration_timestamp, $expiration_hook, [$post_id]);
-            error_log("save_job_meta_box_data: Scheduled expiration event for post {$post_id} at timestamp {$expiration_timestamp}.");
-        } else {
-            if (get_post_status($post_id) === 'publish') {
-                remove_action("save_post_{$post_type}", 'save_job_meta_box_data', 20);
-                wp_update_post(['ID' => $post_id, 'post_status' => 'draft']);
-                add_action("save_post_{$post_type}", 'save_job_meta_box_data', 20);
-                error_log("save_job_meta_box_data: Expiration date is in the past. Set post {$post_id} to draft.");
-            }
-        }
-    }
-
-    // Save the raw meta data
     update_post_meta($post_id, '_job_meta', $meta_to_save);
 }
 
 
-/**
- * The WordPress Cron event callback.
- */
-function dibraco_execute_job_expiration_action($post_id) {
-    $post = get_post($post_id);
-    if ($post && $post->post_type === 'jobs' && $post->post_status === 'publish') {
-        wp_update_post([
-            'ID'          => $post_id,
-            'post_status' => 'draft',
-        ]);
-    }
-}
-add_action('dibraco_expire_job_post_event', 'dibraco_execute_job_expiration_action', 10, 1);
 
 
 function build_job_posting_schema($post_id) {
